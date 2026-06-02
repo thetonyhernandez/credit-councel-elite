@@ -429,7 +429,7 @@ export default function App() {
           <div style={{color:"#fff",fontWeight:900,fontSize:18,lineHeight:1.1,letterSpacing:"-.6px"}}>Credit<br/>Counsel<br/>Elite</div>
           <div style={{color:"rgba(255,255,255,.4)",fontSize:8,letterSpacing:"1.8px",marginTop:5,textTransform:"uppercase",fontWeight:600}}>AI Dispute Agent</div>
         </div>
-        <div style={{display:"flex",alignItems:"flex-end",flex:1,padding:"0 6px"}}>
+        <div style={{display:"flex",alignItems:"flex-end",flex:1,padding:"0 6px",overflowX:"auto",scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
           {["Client Intake","Dispute Package","Step-by-Step Guide","My Case"].map((label,i) => (
             <button key={i} onClick={() => setTab(i)} className="navBtn" style={{background:"none",border:"none",borderBottom:tab===i?"3px solid #E8B84B":"3px solid transparent",padding:"10px 11px",fontSize:12,cursor:"pointer",fontFamily:"inherit",fontWeight:tab===i?700:400,color:tab===i?"#fff":"rgba(255,255,255,.5)",transition:"color .15s",position:"relative",whiteSpace:"nowrap"}}>
               {i===1 && ready && <span style={{position:"absolute",top:9,right:7,width:7,height:7,borderRadius:"50%",background:"#E8B84B"}}/>}
