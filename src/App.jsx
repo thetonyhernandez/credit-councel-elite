@@ -100,19 +100,40 @@ export default function App() {
   useEffect(() => { initAgent(); }, []);
 
   async function callAPI(msgs, maxTok = 900) {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: maxTok, system: SYSTEM, messages: msgs }),
-    });
-    if (!res.ok) throw new Error(res.status);
-    const d = await res.json();
+    let res;
+    try {
+      res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          model: "claude-sonnet-4-20250514", 
+          max_tokens: maxTok, 
+          system: SYSTEM, 
+          messages: msgs 
+        }),
+      });
+    } catch (networkErr) {
+      throw new Error("NETWORK_ERROR: " + networkErr.message);
+    }
+
+    let d;
+    try {
+      d = await res.json();
+    } catch {
+      throw new Error("PARSE_ERROR: status " + res.status);
+    }
+
+    if (!res.ok) {
+      const errMsg = d?.error?.message || d?.error || JSON.stringify(d);
+      throw new Error("API_ERROR " + res.status + ": " + errMsg);
+    }
+
     return d.content?.[0]?.text || "";
   }
 
   async function initAgent() {
     setBusy(true);
-    setStatusTxt("Starting...");
+    setStatusTxt("Connecting...");
     const init = [{ role: "user", content: "START_INTAKE" }];
     try {
       const txt = await callAPI(init, 500);
@@ -120,7 +141,8 @@ export default function App() {
       setMessages([{ from: "agent", text: txt }]);
       setProgress(8);
       setStatusTxt("Collecting client information");
-    } catch {
+    } catch (e) {
+      console.error("initAgent error:", e.message);
       const fallback = "Welcome to Credit Counsel Elite.\n\nI'm your AI intake agent — I'll handle all the heavy lifting so your dispute package is ready to mail.\n\nYou can start by uploading your credit report, or simply tell me your full legal name and we'll go from there.";
       setHistory([{ role: "user", content: "START_INTAKE" }, { role: "assistant", content: fallback }]);
       setMessages([{ from: "agent", text: fallback }]);
@@ -161,8 +183,9 @@ export default function App() {
       } else {
         setMessages(prev => [...prev, { from: "agent", text: txt }]);
       }
-    } catch {
-      setMessages(prev => [...prev, { from: "agent", text: "Connection issue — please try again." }]);
+    } catch (e) {
+      console.error("send error:", e.message);
+      setMessages(prev => [...prev, { from: "agent", text: "Error: " + e.message + "\n\nPlease screenshot this and send to support." }]);
     }
     setBusy(false);
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -204,7 +227,7 @@ export default function App() {
         setProgress(prev => Math.min(80, prev + 15));
         setStatusTxt("Documents read — continuing intake");
       }
-    } catch { setMessages(prev => [...prev, { from: "agent", text: "Trouble reading files. Please try again." }]); }
+    } catch (e) { setMessages(prev => [...prev, { from: "agent", text: "Error reading files: " + e.message }]); }
     setBusy(false);
     inputRef.current?.focus();
   }
