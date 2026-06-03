@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {};
     const payload = {
-      model: body.model || "claude-sonnet-4-20250514",
+      model: body.model || "claude-haiku-4-5-20251001",
       max_tokens: Number(body.max_tokens) || 1000,
       messages: body.messages || [],
     };
