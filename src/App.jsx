@@ -100,10 +100,9 @@ export default function App() {
   useEffect(() => { initAgent(); }, []);
 
   async function callAPI(msgs, maxTok = 900) {
-    const apiUrl = window.location.origin + "/api/chat";
     let res;
     try {
-      res = await fetch(apiUrl, {
+      res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
