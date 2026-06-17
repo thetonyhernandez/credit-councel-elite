@@ -123,21 +123,39 @@ TransUnion: P.O. Box 2000, Chester, PA 19016
 
 FTC REPORT — STEP BY STEP (guide client through this FIRST):
 Go to: https://www.identitytheft.gov
-1. Click "Get Started" → "I Want to Report Identity Theft"
-2. Choose "Credit Card Accounts and Other Accounts" → Continue
-3. Select every box that applies to their negative items (collections, inquiries, accounts) → Continue
-4. Add accounts using credit report as source:
-   - Spell out months fully: "October 12th 2018" NOT "10/12/2018" (dashes get cut off)
-   - Include bank name, open date, last 4 of account number if available
-   - Put multiple accounts in personal statement too
-5. Section 2: Add personal information (only required fields, no email needed)
-6. Section 3: Click "No, not at this time" → Continue
-7. Fill checkboxes: four No's in a row, one Yes, check the two items shown, then No for debt collectors
-8. Personal Statement — must include these exact phrases: "never authorized", "identity theft", "hurting my financial future"
-   Example: "Below are [X] accounts/inquiries that were never authorized by me and I believe they are from identity theft. Remove these accounts at once for they are illegal and are harming my financial future. [List each item with full name and date spelled out]"
-9. Review → Continue → "Submit without an account" → verify by text
-10. Save full PDF — include ALL pages including any blank ones
-11. The FTC Report Number from this PDF is needed for all letters
+1. Click "Report Identity Theft" → "Did someone use your information?" → Yes
+2. "What did the identity thief use your information for?" → Select "Credit card accounts and other types of accounts". Also select auto loan, student loan, or mortgage if those apply.
+3. "How was your information misused?" → "To open a fraudulent credit card account" and/or "To get something else"
+4. Click Continue → Add account information:
+   - Company name as it appears on credit report
+   - When did you notice: say as recently as possible
+   - When was account opened: use date from credit report (month and year)
+   - Outstanding balance if applicable
+   - Account number as it appears on credit report
+   - Add all accounts one by one
+5. Your information: fill in personal details, phone number for verification (can only do twice per day per phone number — need second phone if doing 3 in same day)
+6. "Do you know anything about the person who stole your identity?" → No
+7. "Have you reviewed a copy of your credit report?" → Yes
+8. "Were there any fraudulent accounts?" → Yes (if challenging accounts)
+9. *** SECTION 4 — INQUIRIES (CRITICAL NEW REQUIREMENT) ***
+   - There is a dedicated section specifically for credit inquiries
+   - The field only says "Company Name" BUT YOU MUST INCLUDE BOTH THE COMPANY NAME AND THE DATE
+   - Format each entry as: "Company Name — Date" (e.g. "Microbilt Corporation — September 30, 2024")
+   - This section maxes out at 3 inquiries using the dedicated field
+   - If client has MORE than 3 inquiries, list ALL remaining ones in the personal statement section
+   - Bureaus reject FTC reports when date is missing — they set clients up to fail by not asking for it, but always include the date anyway
+   - Click "Add Company" after each entry
+10. Data breach history → Yes (major breaches like Equifax have affected most people)
+11. Debt collectors → select if dealing with a collections account
+12. PERSONAL STATEMENT — write in TWO separate sections:
+    SECTION 1 (Accounts): "The following account(s) were never authorized by me and I believe they are a result of identity theft. Please remove them at once since they are illegal and hurting my financial future. [Account name, month spelled out, year]"
+    SECTION 2 (Inquiries — list ALL inquiries including any beyond the 3 entered in Section 4): "Additionally, the following [X] inquiries were never authorized by me and should be removed from my credit profile: [Name, Date], [Name, Date], [Name, Date]"
+    - Spell out months fully: "September 30th 2024" NOT "9/30/2024"
+    - Must include: "never authorized", "identity theft", "hurting my financial future"
+13. Review → Continue → Submit WITHOUT an account → verify by text
+14. FTC Report Number is generated at the end — copy it onto your cover letter
+15. Save digital version to computer AND print physical copy for packet
+16. Check pagination — if it says "1 of 4" pages, include ALL 4 pages even if pages 3 and 4 are blank
 
 BACKDOOR BUREAU METHODS (for hard inquiries — use in addition to or before fix packet):
 TransUnion online (cannot remove hard inquiries this way — only accounts/personal info):
@@ -273,7 +291,7 @@ const BUREAUS = [
 
 const GUIDE = [
   { phase: "Phase 1", color: "#1E40AF", title: "Get Your MyFreeScoreNow Report", body: "Go to MyFreeScoreNow.com — this is your primary credit report. It shows all 3 bureaus with real FICO scores. Report must be 8 days old or newer.\n\nLog in → 3B Reports → switch to Classic View (orange button) → right-click Save As → save as single webpage MHTML file.\n\nAlternative: IdentityIQ or MyScoreIQ also work. Never use Credit Karma or the Experian app for disputes — they don't hold legal weight." },
-  { phase: "Phase 2 · Step 1", color: "#D97706", title: "File Your FTC Identity Theft Report FIRST", body: "Do this BEFORE anything else — you need the FTC report number for your letters.\n\n1. Go to IdentityTheft.gov → Get Started → I Want to Report Identity Theft\n2. Choose Credit Card Accounts and Other Accounts\n3. Select every box matching your negative items\n4. Add accounts — spell months fully: 'October 12th 2018' NOT '10/12/2018'\n5. Personal statement must say: 'never authorized', 'identity theft', 'hurting my financial future'\n6. Submit without an account → verify by text\n7. Save full PDF — include ALL pages even blank ones\n\nThe FTC report number from this PDF goes in every letter." },
+  { phase: "Phase 2 · Step 1", color: "#D97706", title: "File Your FTC Identity Theft Report FIRST", body: "Do this BEFORE anything else — you need the FTC report number for your letters.\n\n1. Go to IdentityTheft.gov → Report Identity Theft → Yes\n2. Select Credit Card Accounts and Other Accounts\n3. Add each account with company name + date opened\n4. ⚠️ SECTION 4 — INQUIRIES: The field says 'Company Name' only BUT include BOTH the company name AND the date. Format: 'Microbilt Corporation — September 30, 2024'. Maxes out at 3 — put remaining inquiries in personal statement.\n5. Personal statement — TWO sections: accounts first, then inquiries separately. Must say: 'never authorized', 'identity theft', 'hurting my financial future'\n6. Submit without account → verify by text\n7. Copy FTC Report Number onto your cover letter\n8. Save PDF — include ALL pages even blank ones (check pagination)" },
   { phase: "Phase 2 · Step 2", color: "#6D28D9", title: "Build Your Fix Packet (Per Bureau)", body: "Create ONE packet per bureau in this EXACT order:\n1. Cover Letter (written by hand — see app for your letter)\n2. Personal Information Update Letter\n3. ID Page (driver's license + SSN card + proof of address)\n4. Credit Report pages (summary + disputed accounts + inquiries)\n5. FTC Identity Theft Report (ALL pages)\n6. Police Report (optional)\n7. Affidavit — notarized, different for each bureau\n8. FCRA 605B PDF\n\nCombine into single PDF: ilovepdf.com or PDF24\nMail via USPS Certified Mail with tracking." },
   { phase: "Phase 2 · Step 3", color: "#059669", title: "Document Preparation Rules", body: "ID documents: show ALL FOUR corners, easily legible, no light/dark spots. Never crop corners.\n\nProof of address: crop out the date (over 30 days = rejected). Show only name + company name + your address.\n\nHighlighter: use yellow or blue ONLY. Never pink — it shows as redacted black on TransUnion.\n\nDates: always use separators. January 15th 2025 or 01/15/2025. NEVER 01152025.\n\nAffidavit: must be notarized. Different per bureau. Don't notarize at a bank you're disputing." },
   { phase: "Phase 2 · Step 4", color: "#DC2626", title: "Mail & Call the Bureaus", body: "Mail all 3 packets via USPS Certified Mail with Return Receipt on the same day. Keep every receipt.\n\nCall fraud department exactly 4 BUSINESS DAYS after confirmed delivery (605B law requires block within 4 days):\n• Equifax: 404-885-8000 (landline) / 888-548-7811 (cell)\n• Experian: 714-830-7000 (landline) / 888-397-3742 (cell)\n• TransUnion: 610-690-4909 (landline) / 800-916-8800 (cell)\n• TransUnion: ask for 'Special Handling' department\n\nNEVER say 'dispute' — say 'block' or 'remove under 605B'. You are a victim of identity theft.\nKill them with kindness. Document: date, time, rep name, rep ID number.\nIf banks call you: say 'wrong number, please remove me' and hang up. Never confirm your identity." },
