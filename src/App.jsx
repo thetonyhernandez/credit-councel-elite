@@ -1,4 +1,9 @@
 import { useState, useRef, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const SYSTEM = `You are the official AI intake agent for Credit Counsel Elite, a premium credit repair service operated by Brandon. You are as knowledgeable as Brandon himself — warm, authoritative, and genuinely invested in every client's success. You guide clients through the entire process from intake to fix packet generation.
 
@@ -313,6 +318,81 @@ export default function App() {
   const [uploads,     setUploads]     = useState([]);
   const [approved,    setApproved]    = useState(false);
   const [showReview,  setShowReview]  = useState(false);
+  const [clientId,    setClientId]    = useState(null);
+
+  // Save client to Supabase
+  async function saveClient(data) {
+    try {
+      const { data: client, error } = await supabase
+        .from("clients")
+        .insert([{
+          name: data.clientName || null,
+          address: data.clientAddress || null,
+          dob: data.dob || null,
+          ssn4: data.ssn4 || null,
+          ftc_number: data.ftcNumber || null,
+          status: "intake",
+          brandon_notes: data.brandonsNotes || null,
+        }])
+        .select()
+        .single();
+      if (error) throw error;
+      setClientId(client.id);
+      return client.id;
+    } catch (e) {
+      console.error("saveClient error:", e.message);
+      return null;
+    }
+  }
+
+  // Save package to Supabase
+  async function savePackage(cid, data) {
+    try {
+      const { error } = await supabase
+        .from("packages")
+        .insert([{
+          client_id: cid,
+          equifax: data.equifax || null,
+          experian: data.experian || null,
+          transunion: data.transunion || null,
+          personal_info: data.personalInfo || null,
+          ftc_guide: data.ftcGuide || null,
+          checklist: data.checklist || null,
+          packet_order: data.packetOrder || null,
+          dispute_items: data.disputeItems || null,
+        }]);
+      if (error) throw error;
+    } catch (e) {
+      console.error("savePackage error:", e.message);
+    }
+  }
+
+  // Upload file to Supabase Storage
+  async function uploadToSupabase(file, cid) {
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${cid}/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("client-documents")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage
+        .from("client-documents")
+        .getPublicUrl(path);
+      // Save document record
+      await supabase.from("documents").insert([{
+        client_id: cid,
+        file_name: file.name,
+        file_url: urlData?.publicUrl || path,
+        file_type: file.type,
+        file_size: file.size,
+      }]);
+      return path;
+    } catch (e) {
+      console.error("uploadToSupabase error:", e.message);
+      return null;
+    }
+  }
 
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
@@ -400,6 +480,9 @@ export default function App() {
           setPkg(json);
           setProgress(100);
           setStatusTxt("Package complete");
+          // Save client + package to Supabase
+          const cid = clientId || await saveClient(json);
+          if (cid) await savePackage(cid, json);
           setMessages(prev => [...prev, { from: "agent", text: `Your complete 3-bureau dispute package is ready, ${json.clientName?.split(" ")[0] || ""}! Tap "Package" above to review all letters. Brandon will do a quick review before you print and mail. You're almost there 💪` }]);
           setTimeout(() => { setTab(1); setShowReview(true); }, 1800);
         } catch { setMessages(prev => [...prev, { from: "agent", text: txt.replace("PACKAGE_READY:", "").trim() }]); }
@@ -417,19 +500,36 @@ export default function App() {
   async function handleFiles(e) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
+
+    setUploads(prev => [...prev, ...files.map(f => ({ name: f.name, size: f.size }))]);
+    setMessages(prev => [...prev, { from: "user", text: `📎 Uploading: ${files.map(f => f.name).join(", ")}` }]);
+    setBusy(true);
+    setStatusTxt("Uploading documents...");
+
+    // Upload files to Supabase Storage (no size limit)
+    const cid = clientId || null;
+    for (const file of files) {
+      if (cid) await uploadToSupabase(file, cid);
+    }
+
+    // Also read files for AI extraction (compress large files first)
+    setStatusTxt("Reading documents...");
     const fileData = await Promise.all(files.map(f => new Promise(res => {
       const r = new FileReader();
       r.onload = ev => res({ name: f.name, type: f.type, size: f.size, data: ev.target.result });
       r.readAsDataURL(f);
     })));
-    setUploads(prev => [...prev, ...files.map(f => ({ name: f.name, size: f.size }))]);
-    setMessages(prev => [...prev, { from: "user", text: `📎 Uploaded: ${files.map(f => f.name).join(", ")}` }]);
-    setBusy(true);
-    setStatusTxt("Reading documents...");
+
     const blocks = [];
     for (const fd of fileData) {
-      if (fd.type === "application/pdf") blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: fd.data.split(",")[1] } });
-      else if (fd.type.startsWith("image/")) blocks.push({ type: "image", source: { type: "base64", media_type: fd.type, data: fd.data.split(",")[1] } });
+      // Only send files under 4MB to AI — larger ones just get stored in Supabase
+      if (fd.size > 4 * 1024 * 1024) {
+        blocks.push({ type: "text", text: `File "${fd.name}" (${Math.round(fd.size/1024/1024)}MB) has been saved to secure storage. It is too large to read automatically — please tell me the key information from this document.` });
+      } else if (fd.type === "application/pdf") {
+        blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: fd.data.split(",")[1] } });
+      } else if (fd.type.startsWith("image/")) {
+        blocks.push({ type: "image", source: { type: "base64", media_type: fd.type, data: fd.data.split(",")[1] } });
+      }
     }
     blocks.push({ type: "text", text: `I uploaded: ${files.map(f => f.name).join(", ")}. Please read carefully, extract all info, tell me what you found, and ask for anything still needed.` });
     const newHist = [...history, { role: "user", content: blocks }];
@@ -450,7 +550,16 @@ export default function App() {
         setProgress(prev => Math.min(80, prev + 15));
         setStatusTxt("Documents read — continuing intake");
       }
-    } catch (e) { setMessages(prev => [...prev, { from: "agent", text: "Error reading files: " + e.message }]); }
+    } catch (e) {
+      // Remove the failed upload from history so client can try again
+      setHistory(history);
+      setUploads(prev => prev.slice(0, -files.length));
+      if (e.message.includes("413")) {
+        setMessages(prev => [...prev, { from: "agent", text: "⚠️ That file is too large. Please try compressing the PDF first, or take a screenshot of your credit report and upload it as a JPG image instead. Then try again." }]);
+      } else {
+        setMessages(prev => [...prev, { from: "agent", text: "I had trouble reading that file. Please try again or type the information manually." }]);
+      }
+    }
     setBusy(false);
     inputRef.current?.focus();
   }
