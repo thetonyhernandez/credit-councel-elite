@@ -286,7 +286,24 @@ CONVERSATION RULES:
 - Never re-ask for info already provided or extracted from documents
 - Guide them step by step — they should feel supported, not overwhelmed
 - If they ask questions about the process, answer fully and accurately using Brandon's exact methodology
-- Never say "dispute" when referring to what we're doing — say "block" or "remove" under 605B identity theft rights`;
+- Never say "dispute" when referring to what we're doing — say "block" or "remove" under 605B identity theft rights
+
+═══════════════════════════════════════════
+MEMORY PROTOCOL — CRITICAL (this is what stops re-asking)
+═══════════════════════════════════════════
+You are STATELESS between turns. The only way you remember anything is the running state object described here. Follow this exactly.
+
+1. Before every turn you will receive a block titled "CONFIRMED CLIENT STATE". TREAT IT AS ABSOLUTE TRUTH. Any field already filled there is DONE — never ask for it again, never re-confirm it, never re-summarize a document you've already read. Only ever ask for fields that are still null / empty / missing.
+
+2. At the very END of EVERY reply (after your normal message, and after any PACKAGE_READY block if present), output your updated memory in EXACTLY this format with nothing after it:
+###STATE###
+{"clientName":null,"clientAddress":null,"dob":null,"ssn4":null,"ftcNumber":null,"disputeItems":{"equifax":[],"experian":[],"transunion":[]},"documentsReceived":[],"personalInfoIncorrect":null,"nextNeeded":"<the single next thing you are asking for>","collected":["<short labels of everything confirmed so far>"]}
+###END###
+Carry EVERY previously-known value forward and merge in anything new from this turn. NEVER blank out a field that was already filled. The client never sees this block — it is purely your memory.
+
+3. When a document is uploaded you see it ONCE. Extract everything from it immediately into the state object (name, address, DOB, last-4 SSN, accounts, inquiries, dates). On later turns the raw file is replaced by a placeholder — rely on CONFIRMED CLIENT STATE; never ask the client to re-upload or re-state what you already extracted.
+
+4. Always move FORWARD. Each turn either asks for the ONE next missing item (nextNeeded) or, when everything required is present, generates the package. Never loop back.`;
 
 const BUREAUS = [
   { key: "equifax",     label: "Equifax",     color: "#B91C1C" },
@@ -319,6 +336,8 @@ export default function App() {
   const [approved,    setApproved]    = useState(false);
   const [showReview,  setShowReview]  = useState(false);
   const [clientId,    setClientId]    = useState(null);
+  const [profile,     setProfile]     = useState(null);
+  const profileRef                    = useRef(null);
 
   // Save client to Supabase
   async function saveClient(data) {
@@ -402,6 +421,44 @@ export default function App() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
   useEffect(() => { initAgent(); }, []);
 
+  // Pull the model's running memory block out of a reply, parse it, and return
+  // the clean text the client should actually see (state block removed).
+  function extractState(txt) {
+    const m = txt.match(/###STATE###([\s\S]*?)###END###/);
+    if (!m) return { clean: txt, state: null };
+    const clean = txt.replace(/###STATE###[\s\S]*?###END###/, "").trim();
+    let state = null;
+    try { state = JSON.parse(m[1].trim()); } catch { state = null; }
+    return { clean, state };
+  }
+
+  // Merge new state into memory — never wipe a field that was already filled.
+  function applyState(state) {
+    if (!state) return;
+    const merged = { ...(profileRef.current || {}), ...state };
+    profileRef.current = merged;
+    setProfile(merged);
+  }
+
+  // SYSTEM prompt + the authoritative "already collected" block, injected every call.
+  function buildSystem() {
+    if (!profileRef.current) return SYSTEM;
+    return SYSTEM +
+      "\n\n═══════════════════════════════════════════\nCONFIRMED CLIENT STATE (authoritative — do NOT re-ask any filled field)\n═══════════════════════════════════════════\n" +
+      JSON.stringify(profileRef.current, null, 2);
+  }
+
+  // Replace heavy base64 document/image blocks with a light placeholder so a raw
+  // file is sent to the model only once, never re-sent on every later turn.
+  function lighten(content) {
+    if (!Array.isArray(content)) return content;
+    return content.map(b =>
+      (b && (b.type === "document" || b.type === "image"))
+        ? { type: "text", text: `[${b.type} was uploaded earlier and already read — extracted data is in CONFIRMED CLIENT STATE]` }
+        : b
+    );
+  }
+
   async function callAPI(msgs, maxTok = 900) {
     let res;
     try {
@@ -411,7 +468,7 @@ export default function App() {
         body: JSON.stringify({ 
           model: "claude-sonnet-4-6", 
           max_tokens: maxTok, 
-          system: SYSTEM, 
+          system: buildSystem(), 
           messages: msgs 
         }),
       });
@@ -440,8 +497,10 @@ export default function App() {
     const init = [{ role: "user", content: "START_INTAKE" }];
     try {
       const txt = await callAPI(init, 500);
-      setHistory([...init, { role: "assistant", content: txt }]);
-      setMessages([{ from: "agent", text: txt }]);
+      const { clean, state } = extractState(txt);
+      applyState(state);
+      setHistory([...init, { role: "assistant", content: clean }]);
+      setMessages([{ from: "agent", text: clean }]);
       setProgress(8);
       setStatusTxt("Collecting client information");
     } catch (e) {
@@ -471,12 +530,14 @@ export default function App() {
     else if (turns >= 5) setStatusTxt("Finalizing package...");
     try {
       const txt = await callAPI(newHist, 4000);
-      const updHist = [...newHist, { role: "assistant", content: txt }];
+      const { clean, state } = extractState(txt);
+      applyState(state);
+      const updHist = [...newHist, { role: "assistant", content: clean }];
       setHistory(updHist);
-      if (txt.includes("PACKAGE_READY:")) {
+      if (clean.includes("PACKAGE_READY:")) {
         setProgress(95); setStatusTxt("Generating package…");
         try {
-          const json = JSON.parse(txt.split("PACKAGE_READY:")[1].trim());
+          const json = JSON.parse(clean.split("PACKAGE_READY:")[1].trim());
           setPkg(json);
           setProgress(100);
           setStatusTxt("Package complete");
@@ -485,9 +546,9 @@ export default function App() {
           if (cid) await savePackage(cid, json);
           setMessages(prev => [...prev, { from: "agent", text: `Your complete 3-bureau dispute package is ready, ${json.clientName?.split(" ")[0] || ""}! Tap "Package" above to review all letters. Brandon will do a quick review before you print and mail. You're almost there 💪` }]);
           setTimeout(() => { setTab(1); setShowReview(true); }, 1800);
-        } catch { setMessages(prev => [...prev, { from: "agent", text: txt.replace("PACKAGE_READY:", "").trim() }]); }
+        } catch { setMessages(prev => [...prev, { from: "agent", text: clean.replace("PACKAGE_READY:", "").trim() }]); }
       } else {
-        setMessages(prev => [...prev, { from: "agent", text: txt }]);
+        setMessages(prev => [...prev, { from: "agent", text: clean }]);
       }
     } catch (e) {
       console.error("send error:", e.message);
@@ -536,17 +597,21 @@ export default function App() {
     setHistory(newHist);
     try {
       const txt = await callAPI(newHist, 4000);
-      const updHist = [...newHist, { role: "assistant", content: txt }];
+      const { clean, state } = extractState(txt);
+      applyState(state);
+      // Store a lightened copy so the raw file isn't re-sent on every later turn.
+      const lightHist = [...history, { role: "user", content: lighten(blocks) }];
+      const updHist = [...lightHist, { role: "assistant", content: clean }];
       setHistory(updHist);
-      if (txt.includes("PACKAGE_READY:")) {
+      if (clean.includes("PACKAGE_READY:")) {
         try {
-          const json = JSON.parse(txt.split("PACKAGE_READY:")[1].trim());
+          const json = JSON.parse(clean.split("PACKAGE_READY:")[1].trim());
           setPkg(json); setProgress(100); setStatusTxt("Package complete");
           setMessages(prev => [...prev, { from: "agent", text: `Package auto-generated from your documents! Tap "Package" above to review.` }]);
           setTimeout(() => { setTab(1); setShowReview(true); }, 1400);
-        } catch { setMessages(prev => [...prev, { from: "agent", text: txt.replace("PACKAGE_READY:", "").trim() }]); }
+        } catch { setMessages(prev => [...prev, { from: "agent", text: clean.replace("PACKAGE_READY:", "").trim() }]); }
       } else {
-        setMessages(prev => [...prev, { from: "agent", text: txt }]);
+        setMessages(prev => [...prev, { from: "agent", text: clean }]);
         setProgress(prev => Math.min(80, prev + 15));
         setStatusTxt("Documents read — continuing intake");
       }
