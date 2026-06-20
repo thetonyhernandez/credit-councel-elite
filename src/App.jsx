@@ -82,62 +82,48 @@ Bureaus have been rejecting packets saying "looks like a credit repair company."
 You will generate the cover letter content so the client can copy it by hand word for word.
 Tell them: "Copy this letter exactly by hand on plain white paper. Your handwriting defeats the AI/template detection systems the bureaus use."
 
-COVER LETTER FORMAT (generate filled in with client's real info):
-[Date written out: e.g. January 15, 2025]
+COVER LETTER — REPRODUCE THIS TEMPLATE WORD FOR WORD, filled with the client's real info. Do NOT reword, rephrase, or "improve" it. Use the bureau's hard-coded name and address below. Format each disputed account as a numbered line "N.CREDITOR MM/DD/YYYY" (uppercase creditor, the date it was opened, no extra words), exactly like the sample. Use the count of accounts for [N].
 
 [Client Full Name]
-[Client Full Address]
+[Client Street Address]
+[City, State ZIP]
+[FULL BUREAU NAME AND ADDRESS — use the hard-coded block below]
+Date: MM/DD/YYYY
+RE: Social Security Number; [full SSN]
+To Whom It May Concern,
+While checking my most recent credit report, I noticed [N] Accounts, and personal identification information that I did not authorize, I am unaware of, and believe to be fraudulent made by the following companies:
+Account:
+1.[CREDITOR] MM/DD/YYYY
+2.[CREDITOR] MM/DD/YYYY
+3.[CREDITOR] MM/DD/YYYY
+I did not authorize anyone employed by these companies to make any inquiry and view my credit report and believe these to be fraudulent. This is a violation of the Fair Credit Reporting Act Section 1681b(c) and a serious breach of my privacy rights. I formally request that these fraudulent inquiries and Account be immediately deleted from the credit file that you maintain under my Social Security number.
+I called all companies involved, canceled or closed any products issued, and was instructed by these companies and [BUREAU NAME] to let you know formally with these instructions included. I've attached an FTC Report #[FTC NUMBER] as well as my official License state ID, Social Security Card, and Proof of current Residency. If anything comes verified, show me signatures and original documents showing true accuracy.
+Please provide me with an updated copy of my credit report.
+Please note that you have 30 days to complete this investigation, as per the Fair Credit Reporting Act section 611.
+My contact information is as follows:
+[Client Full Name]
+[Client Street Address]
 [City, State ZIP]
 
-[Bureau Name]
-[Bureau Address]
-
-RE: FCRA Section 605B Identity Theft Block Request
-
-To Whom It May Concern,
-
-My name is [Full Name]. I am writing to formally request the immediate blocking of fraudulent information on my credit report under FCRA Section 605B.
-
-The following items were not authorized by me and are the result of identity theft:
-
-[List each disputed item for THIS bureau: creditor name, account type, date, reason = identity theft / not authorized]
-
-I have enclosed my FTC Identity Theft Report #[FTC number], government-issued ID, Social Security card, proof of current address, and a copy of my credit report with disputed items highlighted.
-
-Under FCRA Section 605B (15 U.S.C. § 1681c-2), I request these items be BLOCKED within 4 business days of receipt of this letter. I am a victim of identity theft and did not authorize these accounts or inquiries.
-
-Please provide written confirmation of the block and send me an updated copy of my credit report.
-
-Sincerely,
-[Client Full Name]
-[Client Phone Number]
-[Client Address]
-
-PERSONAL INFORMATION CORRECTION LETTER FORMAT:
-[Date]
-[Bureau Name]
-[Bureau Address]
-
+PERSONAL INFORMATION CORRECTION LETTER — REPRODUCE WORD FOR WORD (only generate if the client has incorrect personal info on the report):
+Date MM/DD/YYYY
+Credit Bureau Name: [Bureau Name]
+Credit Bureau Address: [hard-coded bureau address below]
 To Whom It May Concern:
-
 I am writing to update/correct my personal information on file with your company.
-
 Please update my address to: [Current Address]
 Please update my name to: [Full Legal Name]
-My only social security number is: [SSN]
+My only social security number is: [full SSN]
 My only and correct date of birth is: [DOB]
-
 I do not wish to have any telephone numbers on my report.
-Please remove all other addresses from my report, as they are not deliverable to me by the U.S. post office and are not reportable per the FCRA since they are inaccurate.
+Please remove all the other addresses off my report, as they are not deliverable to me by the U.S. post office, and they are not reportable as per the FCRA, since they are inaccurate.
+Sincerely, [Full Legal Name]
+Enc. Driver License, Passport, SSN Card, and Proof of Residence
 
-Sincerely,
-[Client Full Name]
-Enc. Driver License, SSN Card, and Proof of Residence
-
-BUREAU MAILING ADDRESSES:
-Equifax: P.O. Box 740256, Atlanta, GA 30374-0256
-Experian: P.O. Box 4500, Allen, TX 75013
-TransUnion: P.O. Box 2000, Chester, PA 19016
+BUREAU MAILING ADDRESSES (use these EXACTLY in the letters):
+Equifax: Equifax Information Services, LLC., P.O. Box 740256, Atlanta, GA 30374-0256
+Experian: Experian, P.O. Box 4500, Allen, TX 75013
+TransUnion: TransUnion Consumer Solutions, P.O. Box 2000, Chester, PA 19016-2000
 
 FTC REPORT — STEP BY STEP (guide client through this FIRST):
 Go to: https://www.identitytheft.gov
@@ -285,21 +271,24 @@ Step 5 — Generate full package
 OUTPUT FORMAT
 ═══════════════════════════════════════════
 
-When you have client name, address, DOB, last 4 SSN, disputed items, and FTC report number, output EXACTLY this (nothing before or after):
+When you have client name, address, DOB, last 4 SSN, disputed items, and FTC report number, output EXACTLY this (nothing before or after). The three bureau cover letters MUST be the exact COVER LETTER template reproduced word for word — same sentences, same order — only the bureau name/address, the client's info, and the numbered "N.CREDITOR MM/DD/YYYY" account lines change:
 
 PACKAGE_READY:
-{"clientName":"[full name]","clientAddress":"[full address]","dob":"[dob]","ssn4":"[last 4]","ftcNumber":"[FTC report number]","equifax":"[complete fully-filled Equifax cover letter — written as if handwritten, warm personal tone, filled with real client info and real disputed items for Equifax only]","experian":"[complete Experian cover letter]","transunion":"[complete TransUnion cover letter]","personalInfo":"[complete personal info correction letter filled with client details]","handwrittenNote":"[Instructions for client: Copy this letter by hand word for word on plain white paper. Use blue or black pen. Your handwriting is important — it shows the bureaus this is personal and not from a credit repair company. Do not type it.]","ftcGuide":"[Complete personalized step-by-step FTC filing guide based on THEIR specific disputed items, with exact wording for their personal statement]","disputeItems":{"equifax":["item1 — creditor, type, date"],"experian":["item1"],"transunion":["item1"]},"checklist":["Complete MyFreeScoreNow credit report (first pages through summary + all disputed account pages + inquiry pages — highlight in yellow or blue, NO pink)","Government-issued photo ID — all 4 corners visible, no dark/light spots","Social Security card — all 4 corners visible","Proof of current address — utility bill or bank statement, date cropped out, within 30 days","FTC Identity Theft Report — ALL pages including any blank pages","Affidavit (Identity Theft Victim Complaint) — notarized, signed, specific to this bureau","FCRA 605B PDF document","Police Report (optional but strengthens packet)"],"packetOrder":"1. Cover Letter (handwritten) → 2. Personal Info Letter (OPTIONAL — only if personal info needs correction) → 3. ID Page → 4. Credit Report Pages → 5. FTC Report → 6. Police Report (optional) → 7. Affidavit (notarized) → 8. FCRA 605B PDF","brandonsNotes":"[2-3 sentences for Brandon flagging anything unusual, items that need double-checking, or client-specific notes]"}
+{"clientName":"[full name]","clientAddress":"[full address]","dob":"[dob]","ssn4":"[last 4]","ftcNumber":"[FTC report number]","equifax":"[the COVER LETTER template reproduced verbatim, addressed to Equifax with Equifax's hard-coded address, accounts as numbered N.CREDITOR MM/DD/YYYY lines]","experian":"[same verbatim cover letter, addressed to Experian]","transunion":"[same verbatim cover letter, addressed to TransUnion]","personalInfo":"[the PERSONAL INFORMATION CORRECTION LETTER reproduced verbatim, filled with client details — only if personal info is incorrect on the report]","handwrittenNote":"[Instructions for client: Copy this letter by hand word for word on plain white paper. Use blue or black pen. Your handwriting is important — it shows the bureaus this is personal and not from a credit repair company. Do not type it.]","ftcGuide":"[Complete personalized step-by-step FTC filing guide based on THEIR specific disputed items, with exact wording for their personal statement]","disputeItems":{"equifax":["item1 — creditor, type, date"],"experian":["item1"],"transunion":["item1"]},"checklist":["Complete MyFreeScoreNow credit report (first pages through summary + all disputed account pages + inquiry pages — highlight in yellow or blue, NO pink)","Government-issued photo ID — all 4 corners visible, no dark/light spots","Social Security card — all 4 corners visible","Proof of current address — utility bill or bank statement, date cropped out, within 30 days","FTC Identity Theft Report — ALL pages including any blank pages","Affidavit (Identity Theft Victim Complaint) — notarized, signed, specific to this bureau","FCRA 605B PDF document","Police Report (optional but strengthens packet)"],"packetOrder":"1. Cover Letter (handwritten) → 2. Personal Info Letter (OPTIONAL — only if personal info needs correction) → 3. ID Page → 4. Credit Report Pages → 5. FTC Report → 6. Police Report (optional) → 7. Affidavit (notarized) → 8. FCRA 605B PDF","brandonsNotes":"[2-3 sentences for Brandon flagging anything unusual, items that need double-checking, or client-specific notes]"}
 
 ═══════════════════════════════════════════
 DOCUMENTS & IMAGES TO COLLECT (actively ask for these during intake)
 ═══════════════════════════════════════════
-You MUST collect all of the following from the client before a package can be finalized. Ask for them naturally, ONE at a time, and tell them they can upload a photo or scan right here in the chat using the upload button below the message box. Record each in CONFIRMED CLIENT STATE under "documentsReceived" and never ask twice for one already received.
+You MUST collect all of the following from the client before a package can be finalized. This is your TOP priority during intake. Right after you learn the client's name, tell them the documents you'll need and immediately ask them to upload the FIRST one. Request them ONE AT A TIME, in this order, asking for the next only after the previous arrives. Tell them to tap the upload button below the message box to send a photo or scan. Record each in CONFIRMED CLIENT STATE under "documentsReceived" and never ask twice for one already received.
 1. Credit report — MyFreeScoreNow (primary source). Needed to identify the items to block.
-2. Government-issued photo ID — clear photo, all four corners visible, no glare or dark spots.
+2. Government-issued photo ID — driver's license and/or passport. Clear photo, all four corners visible, no glare or dark spots.
 3. Social Security card — clear photo, all four corners visible.
-4. Proof of current address — utility bill or bank statement within 30 days, with the date area cropped out; show only name, company, and address.
-5. FTC Identity Theft Report — filed at IdentityTheft.gov; you need the FTC report number. If they have not filed yet, walk them through it step by step (use the FTC guide), then have them save the PDF and upload it.
-6. Police report (optional) — strengthens the packet if they have one.
+4. Proof of current address — an electric/utility bill or bank statement within 30 days, date area cropped out; show only name, company, and address.
+5. FTC Identity Theft Report — filed at IdentityTheft.gov; you need the FTC report number AND the saved report. If they have not filed, walk them through it step by step (use the FTC guide), then have them upload the PDF or a photo of it.
+6. Identity Theft Affidavit (Identity Theft Victim's Complaint, H-1 through H-6) — filled out and notarized; have them upload it.
+7. Police report (optional) — strengthens the packet if they have one.
+(The FCRA 605B law page is added to every packet automatically — do NOT ask the client for it.)
+NEVER generate a package while any required document is missing. If something is missing, ask for it — do not skip ahead. Your job is to request and confirm these documents, then build the package.
 As each image or PDF arrives, confirm what you can see, extract the details into state, then move to the next missing item. Once the credit report, photo ID, Social Security card, proof of address, and FTC report number are all present, you have what you need — generate the full package (a complete cover letter for EACH of the three bureaus, plus the personal info letter if needed, the FTC guide, the checklist, and the packet order) via the PACKAGE_READY block.
 
 CONVERSATION RULES:
@@ -336,6 +325,38 @@ const BUREAUS = [
   { key: "transunion",  label: "TransUnion",  color: "#1D4ED8" },
 ];
 
+// Mail-packet documents, in Brandon's exact assembly order (after the letters).
+const PACKET_SLOTS = [
+  { key: "photoID",        label: "Driver's License / Photo ID" },
+  { key: "passport",       label: "Passport" },
+  { key: "ssnCard",        label: "Social Security Card" },
+  { key: "proofResidence", label: "Proof of Residence (utility / electric bill)" },
+  { key: "creditReport",   label: "Credit Report (MyFreeScoreNow)" },
+  { key: "ftcReport",      label: "FTC Identity Theft Report" },
+  { key: "affidavit",      label: "Identity Theft Affidavit (notarized)" },
+  { key: "policeReport",   label: "Police Report (optional)" },
+];
+
+// Standard FCRA 605B law page — auto-added to every packet, identical each time.
+const FCRA_605B_TEXT = `FCRA § 605B (15 U.S.C. § 1681c-2)
+Block of information resulting from identity theft
+
+(a) Block. Except as otherwise provided in this section, a consumer reporting agency shall block the reporting of any information in the file of a consumer that the consumer identifies as information that resulted from an alleged identity theft, not later than 4 business days after the date of receipt by such agency of —
+   (1) appropriate proof of the identity of the consumer;
+   (2) a copy of an identity theft report;
+   (3) the identification of such information by the consumer; and
+   (4) a statement by the consumer that the information is not information relating to any transaction by the consumer.
+
+(b) Notification. A consumer reporting agency shall promptly notify the furnisher of information identified by the consumer under subsection (a) —
+   (1) that the information may be a result of identity theft;
+   (2) that an identity theft report has been filed;
+   (3) that a block has been requested under this section; and
+   (4) of the effective dates of the block.
+
+(c) Authority to decline or rescind. A consumer reporting agency may decline to block, or may rescind any block, of information relating to a consumer under this section, if the agency reasonably determines that the information was blocked in error or on the basis of a material misrepresentation, or that the consumer obtained possession of goods, services, or money as a result of the blocked transaction.
+
+(d) Exception for resellers and (e) Exception for verification companies and (f) Access by law enforcement apply as set forth in the statute.`;
+
 const GUIDE = [
   { phase: "Phase 1", color: "#1E40AF", title: "Get Your MyFreeScoreNow Report", body: "Go to MyFreeScoreNow.com — this is your primary credit report. It shows all 3 bureaus with real FICO scores. Report must be 8 days old or newer.\n\nLog in → 3B Reports → switch to Classic View (orange button) → right-click Save As → save as single webpage MHTML file.\n\nAlternative: IdentityIQ or MyScoreIQ also work. Never use Credit Karma or the Experian app for disputes — they don't hold legal weight." },
   { phase: "Phase 2 · Step 1", color: "#D97706", title: "File Your FTC Identity Theft Report FIRST", body: "Do this BEFORE anything else — you need the FTC report number for your letters.\n\n1. Go to IdentityTheft.gov → Report Identity Theft → Yes\n2. Select Credit Card Accounts and Other Accounts\n3. Add each account with company name + date opened\n4. ⚠️ SECTION 4 — INQUIRIES: The field says 'Company Name' only BUT include BOTH the company name AND the date. Format: 'Microbilt Corporation — September 30, 2024'. Maxes out at 3 — put remaining inquiries in personal statement.\n5. Personal statement — TWO sections: accounts first, then inquiries separately. Must say: 'never authorized', 'identity theft', 'hurting my financial future'\n6. Submit without account → verify by text\n7. Copy FTC Report Number onto your cover letter\n8. Save PDF — include ALL pages even blank ones (check pagination)" },
@@ -358,6 +379,8 @@ export default function App() {
   const [progress,    setProgress]    = useState(0);
   const [statusTxt,   setStatusTxt]   = useState("Ready to begin");
   const [uploads,     setUploads]     = useState([]);
+  const [docFiles,    setDocFiles]    = useState([]);
+  const [slots,       setSlots]       = useState({});
   const [approved,    setApproved]    = useState(false);
   const [showReview,  setShowReview]  = useState(false);
   const [clientId,    setClientId]    = useState(null);
@@ -626,6 +649,20 @@ export default function App() {
       r.readAsDataURL(f);
     })));
 
+    // Keep images/PDFs so we can assemble them into the mailable packet PDF later.
+    const docs = fileData.filter(f => f.type.startsWith("image/") || f.type === "application/pdf");
+    setDocFiles(prev => [...prev, ...docs.map(f => ({ name: f.name, type: f.type, dataUrl: f.data }))]);
+    // Auto-sort each into its packet slot (first empty matching slot) so the packet
+    // assembles in the correct order; can be corrected in the Documents tab.
+    setSlots(prev => {
+      const next = { ...prev };
+      for (const f of docs) {
+        const cat = inferSlot(f.name);
+        if (cat && !next[cat]) next[cat] = { name: f.name, type: f.type, dataUrl: f.data };
+      }
+      return next;
+    });
+
     const blocks = [];
     for (const fd of fileData) {
       // Only send reasonably-sized files to the AI; larger ones live in Supabase only.
@@ -691,78 +728,127 @@ export default function App() {
     navigator.clipboard.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(""), 2200); });
   }
 
-  // Load jsPDF on demand from CDN (no build dependency needed).
-  function loadJsPDF() {
+  // Load a library on demand from CDN (no build dependency needed).
+  function loadScript(src, globalCheck) {
     return new Promise((resolve, reject) => {
-      if (window.jspdf?.jsPDF) return resolve(window.jspdf.jsPDF);
+      const have = globalCheck();
+      if (have) return resolve(have);
       const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-      s.onload = () => window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(new Error("jsPDF unavailable"));
-      s.onerror = () => reject(new Error("Failed to load PDF library"));
+      s.src = src;
+      s.onload = () => { const g = globalCheck(); g ? resolve(g) : reject(new Error("library unavailable")); };
+      s.onerror = () => reject(new Error("Failed to load " + src));
       document.body.appendChild(s);
     });
   }
+  const loadJsPDF = () => loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => window.jspdf?.jsPDF);
+  const loadPdfLib = () => loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js", () => window.PDFLib);
 
-  // Build one complete, mailable PDF for a single bureau: cover letter (to handwrite),
-  // personal info letter (if any), packet assembly order + checklist, and FTC guide.
-  async function genBureauPDF(bureauKey) {
+  function dataURLtoBytes(dataUrl) {
+    const b64 = (dataUrl || "").split(",")[1] || "";
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  }
+
+  // Build the letters portion of a bureau packet (returns a jsPDF doc, no save).
+  // Infer which packet slot an uploaded file belongs to, from its filename.
+  function inferSlot(name) {
+    const n = (name || "").toLowerCase();
+    if (/passport/.test(n)) return "passport";
+    if (/affidavit|complaint|victim|idtheftaffidavit|\bh-?1\b/.test(n)) return "affidavit";
+    if (/police/.test(n)) return "policeReport";
+    if (/ftc|identitytheft|idtheft|theft/.test(n)) return "ftcReport";
+    if (/ssn|social/.test(n)) return "ssnCard";
+    if (/licen|driver|state.?id|photo.?id|\bdl\b|\bid\b/.test(n)) return "photoID";
+    if (/bill|utility|electric|sdge|residence|lease|proof|address/.test(n)) return "proofResidence";
+    if (/credit.?report|report|3b|tri|fico|score/.test(n)) return "creditReport";
+    return null;
+  }
+
+  // The per-bureau letters that lead the packet: cover letter + personal info letter.
+  function buildLettersDoc(bureauKey, JsPDF) {
+    const b = BUREAUS.find(x => x.key === bureauKey);
+    const doc = new JsPDF({ unit: "pt", format: "letter" });
+    const M = 56, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), maxW = W - M * 2;
+    let y = M;
+    const room = (lh) => { if (y + lh > H - M) { doc.addPage(); y = M; } };
+    const heading = (txt, color) => { room(30); doc.setFont("times", "bold"); doc.setFontSize(15); doc.setTextColor(color || "#0f172a"); doc.text(txt, M, y); y += 10; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 18; doc.setTextColor("#111111"); };
+    const para = (txt, size = 11, lh = 16) => { doc.setFont("times", "normal"); doc.setFontSize(size); doc.setTextColor("#111111"); doc.splitTextToSize(String(txt || ""), maxW).forEach(line => { room(lh); doc.text(line, M, y); y += lh; }); };
+    const banner = (txt, bg, fg) => { room(34); doc.setFillColor(bg); doc.roundedRect(M, y - 12, maxW, 28, 4, 4, "F"); doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(fg); doc.splitTextToSize(txt, maxW - 20).forEach((ln, i) => doc.text(ln, M + 10, y + 4 + i * 12)); y += 34; doc.setTextColor("#111111"); };
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(b.color); doc.text("Credit Counsel Elite", M, y); y += 22;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor("#64748b"); doc.text(`${b.label} Dispute Package — ${pkg.clientName || ""}`, M, y); y += 14;
+    doc.text(new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), M, y); y += 26;
+    heading(`Cover Letter — ${b.label}`, b.color);
+    banner("HANDWRITE THIS — copy it word for word in blue or black ink on plain white paper. Your handwriting defeats the bureaus' credit-repair-company detection.", "#f3e8ff", "#6b21a8");
+    para(pkg[bureauKey], 11, 16);
+    if (pkg.personalInfo) { doc.addPage(); y = M; heading("Personal Information Correction Letter", "#374151"); para(pkg.personalInfo, 11, 16); }
+    return doc;
+  }
+
+  // The standard FCRA 605B law page that closes every packet.
+  function build605BDoc(JsPDF) {
+    const doc = new JsPDF({ unit: "pt", format: "letter" });
+    const M = 56, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), maxW = W - M * 2;
+    let y = M;
+    doc.setFont("times", "normal"); doc.setFontSize(11); doc.setTextColor("#111111");
+    FCRA_605B_TEXT.split("\n").forEach(line => {
+      doc.splitTextToSize(line, maxW).forEach(seg => { if (y + 15 > H - M) { doc.addPage(); y = M; } doc.text(seg, M, y); y += 15; });
+    });
+    return doc;
+  }
+
+  // Build ONE complete mailable PDF per bureau, in Brandon's exact order:
+  // cover letter → personal info → ID/passport/SSN/bill → credit report → FTC report
+  // → affidavit → FCRA 605B. Documents come from the slots; chat uploads are the fallback.
+  async function downloadBureauPacket(bureauKey) {
     const b = BUREAUS.find(x => x.key === bureauKey);
     if (!pkg || !b || !pkg[bureauKey]) return;
+    const safe = (pkg.clientName || "client").replace(/[^a-z0-9]+/gi, "_");
     try {
-      setStatusTxt(`Building ${b.label} PDF…`);
+      setStatusTxt(`Building ${b.label} packet…`);
       const JsPDF = await loadJsPDF();
-      const doc = new JsPDF({ unit: "pt", format: "letter" });
-      const M = 56, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), maxW = W - M * 2;
-      let y = M;
-      const room = (lh) => { if (y + lh > H - M) { doc.addPage(); y = M; } };
-      const heading = (txt, color) => {
-        room(30); doc.setFont("times", "bold"); doc.setFontSize(15); doc.setTextColor(color || "#0f172a");
-        doc.text(txt, M, y); y += 10; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 18; doc.setTextColor("#111111");
+      const lettersDoc = buildLettersDoc(bureauKey, JsPDF);
+      // Documents to attach: slots in order, else fall back to chat-upload order.
+      const ordered = PACKET_SLOTS.map(s => slots[s.key]).filter(Boolean);
+      const attachments = ordered.length ? ordered : docFiles;
+      const PDFLib = await loadPdfLib();
+      const merged = await PDFLib.PDFDocument.create();
+      const appendDoc = async (jsdoc) => {
+        const d = await PDFLib.PDFDocument.load(jsdoc.output("arraybuffer"));
+        (await merged.copyPages(d, d.getPageIndices())).forEach(p => merged.addPage(p));
       };
-      const para = (txt, size = 11, lh = 16, style = "normal") => {
-        doc.setFont("times", style); doc.setFontSize(size); doc.setTextColor("#111111");
-        doc.splitTextToSize(String(txt || ""), maxW).forEach(line => { room(lh); doc.text(line, M, y); y += lh; });
-      };
-      const banner = (txt, bg, fg) => {
-        room(34); doc.setFillColor(bg); doc.roundedRect(M, y - 12, maxW, 28, 4, 4, "F");
-        doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(fg);
-        doc.splitTextToSize(txt, maxW - 20).forEach((ln, i) => doc.text(ln, M + 10, y + 4 + i * 12));
-        y += 34; doc.setTextColor("#111111");
-      };
-      // Title
-      doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(b.color);
-      doc.text("Credit Counsel Elite", M, y); y += 22;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor("#64748b");
-      doc.text(`${b.label} Dispute Package — ${pkg.clientName || ""}`, M, y); y += 14;
-      doc.text(new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), M, y); y += 26;
-      // Cover letter
-      heading(`Cover Letter — ${b.label}`, b.color);
-      banner("HANDWRITE THIS — copy it word for word in blue or black ink on plain white paper. Your handwriting defeats the bureaus' credit-repair-company detection.", "#f3e8ff", "#6b21a8");
-      para(pkg[bureauKey], 11, 16);
-      // Personal info letter (optional)
-      if (pkg.personalInfo) {
-        doc.addPage(); y = M;
-        heading("Personal Information Correction Letter", "#374151");
-        banner("This letter may be typed and printed.", "#eef2ff", "#3730a3");
-        para(pkg.personalInfo, 11, 16);
+      await appendDoc(lettersDoc);
+      for (const f of attachments) {
+        try {
+          const bytes = dataURLtoBytes(f.dataUrl);
+          if (f.type === "application/pdf") {
+            const d = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+            (await merged.copyPages(d, d.getPageIndices())).forEach(p => merged.addPage(p));
+          } else {
+            let img;
+            try { img = await merged.embedJpg(bytes); } catch { img = await merged.embedPng(bytes); }
+            const page = merged.addPage([612, 792]);
+            const s = Math.min((612 - 72) / img.width, (792 - 72) / img.height, 1);
+            const w = img.width * s, h = img.height * s;
+            page.drawImage(img, { x: (612 - w) / 2, y: (792 - h) / 2, width: w, height: h });
+          }
+        } catch (inner) { console.error("Skipped document", f.name, inner.message); }
       }
-      // Packet order + checklist
-      doc.addPage(); y = M;
-      heading("Mail Packet — Assembly Order", "#059669");
-      if (pkg.packetOrder) { para(pkg.packetOrder, 11, 18); y += 6; }
-      if (pkg.checklist?.length) { heading("Document Checklist", "#059669"); pkg.checklist.forEach(it => para("•  " + it, 10.5, 15)); }
-      // FTC guide
-      if (pkg.ftcGuide) { doc.addPage(); y = M; heading("FTC Identity Theft Report — Filing Guide", "#D97706"); para(pkg.ftcGuide, 10.5, 15); }
-      const safe = (pkg.clientName || "client").replace(/[^a-z0-9]+/gi, "_");
-      doc.save(`CCE_${b.label}_${safe}.pdf`);
-      setStatusTxt("PDF downloaded");
+      await appendDoc(build605BDoc(JsPDF)); // standard law page closes the packet
+      const out = await merged.save();
+      const blob = new Blob([out], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = `CCE_${b.label}_Packet_${safe}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+      setStatusTxt("Packet downloaded");
     } catch (e) {
-      console.error("genBureauPDF error:", e.message);
-      printBureau(bureauKey); // dependency-free fallback: browser "Save as PDF"
+      console.error("downloadBureauPacket error:", e.message);
+      printBureau(bureauKey); // dependency-free fallback
     }
   }
 
-  // Fallback: open a clean print window for one bureau (use the browser's Save as PDF).
+  // Fallback: open a clean print window for one bureau (browser "Save as PDF").
   function printBureau(bureauKey) {
     const b = BUREAUS.find(x => x.key === bureauKey);
     if (!b || !pkg?.[bureauKey]) return;
@@ -777,10 +863,10 @@ export default function App() {
     w.document.close(); setTimeout(() => w.print(), 400);
   }
 
-  // Download a separate PDF for each of the three bureaus.
-  async function downloadAllPDFs() {
+  // Download a separate full packet PDF for each of the three bureaus.
+  async function downloadAllPackets() {
     for (const b of BUREAUS) {
-      if (pkg?.[b.key]) { await genBureauPDF(b.key); await new Promise(r => setTimeout(r, 500)); }
+      if (pkg?.[b.key]) { await downloadBureauPacket(b.key); await new Promise(r => setTimeout(r, 700)); }
     }
   }
 
@@ -801,8 +887,16 @@ export default function App() {
     { key: "personalInfo",    label: "Personal Info",  color: "#374151" },
     { key: "handwrittenNote", label: "✍️ Handwritten", color: "#7C3AED" },
     { key: "ftcGuide",        label: "FTC Guide",      color: "#D97706" },
+    { key: "documents",       label: "📎 Documents",   color: "#0f766e" },
     { key: "checklist",       label: "Checklist",      color: "#059669" },
   ];
+
+  function setSlotFile(category, file) {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = ev => setSlots(prev => ({ ...prev, [category]: { name: file.name, type: file.type, dataUrl: ev.target.result } }));
+    r.readAsDataURL(file);
+  }
 
   return (
     <div style={{ fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif", height: "100vh", display: "flex", flexDirection: "column", background: "#FAFAF9", color: "#0f172a", overflow: "hidden" }}>
@@ -960,7 +1054,31 @@ export default function App() {
 
                 {/* Content */}
                 <div style={{ flex: 1, overflowY: "auto" }}>
-                  {docTab === "checklist" ? (
+                  {docTab === "documents" ? (
+                    <div style={{ padding: "20px 18px" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Packet Documents</div>
+                      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16, lineHeight: 1.5 }}>These attach to every bureau packet in this exact order. Uploads from the chat are sorted here automatically — tap any row to set or replace a file.</div>
+                      {PACKET_SLOTS.map((s, i) => (
+                        <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #f1f5f9" }}>
+                          <div style={{ width: 22, height: 22, borderRadius: 6, background: slots[s.key] ? "#0f766e" : "#f1f5f9", color: slots[s.key] ? "#fff" : "#94a3b8", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{slots[s.key] ? "✓" : i + 1}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, color: "#1e293b", fontWeight: 600 }}>{s.label}</div>
+                            <div style={{ fontSize: 11, color: slots[s.key] ? "#0f766e" : "#cbd5e1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{slots[s.key]?.name || "Not uploaded"}</div>
+                          </div>
+                          {slots[s.key] && (
+                            <button onClick={() => setSlots(prev => { const n = { ...prev }; delete n[s.key]; return n; })} style={{ background: "none", border: "none", color: "#cbd5e1", fontSize: 16, cursor: "pointer", padding: "0 4px" }}>✕</button>
+                          )}
+                          <label style={{ fontSize: 12, fontWeight: 600, color: "#0f766e", border: "1.5px solid #99f6e4", borderRadius: 8, padding: "6px 12px", cursor: "pointer", flexShrink: 0 }}>
+                            {slots[s.key] ? "Replace" : "Upload"}
+                            <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => { setSlotFile(s.key, e.target.files[0]); e.target.value = ""; }} />
+                          </label>
+                        </div>
+                      ))}
+                      <div style={{ marginTop: 16, background: "#f0fdfa", border: "1px solid #99f6e4", borderRadius: 10, padding: "12px 14px", fontSize: 12, color: "#0f766e", lineHeight: 1.6 }}>
+                        The FCRA 605B law page is added to every packet automatically — no upload needed. Use the green Download button below to generate each bureau's complete PDF.
+                      </div>
+                    </div>
+                  ) : docTab === "checklist" ? (
                     <div style={{ padding: "20px 18px" }}>
                       {pkg?.packetOrder && (
                         <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
@@ -1030,10 +1148,10 @@ export default function App() {
                       </button>
                     )}
                     <button
-                      onClick={() => (BUREAUS.some(b => b.key === docTab) ? genBureauPDF(docTab) : downloadAllPDFs())}
+                      onClick={() => (BUREAUS.some(b => b.key === docTab) ? downloadBureauPacket(docTab) : downloadAllPackets())}
                       className="action-btn"
                       style={{ flex: 2, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#0f766e", border: "none", color: "#fff" }}>
-                      ⬇ {BUREAUS.some(b => b.key === docTab) ? `Download ${BUREAUS.find(b => b.key === docTab)?.label} PDF` : "Download all 3 bureau PDFs"}
+                      ⬇ {BUREAUS.some(b => b.key === docTab) ? `Download ${BUREAUS.find(b => b.key === docTab)?.label} packet PDF` : "Download all 3 bureau packets"}
                     </button>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
