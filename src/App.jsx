@@ -3,7 +3,20 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Guard init: a missing/blank env var must NEVER crash the whole app to a white screen.
+let supabase = null;
+try {
+  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } else {
+    console.error("Supabase env vars missing — persistence disabled, but the app still runs.");
+  }
+} catch (e) {
+  console.error("Supabase init failed — app still runs without persistence:", e);
+}
+
+// Vercel serverless requests are capped near 4.5MB; stay safely under it to avoid 413s.
+const SAFE_BODY_LIMIT = 4000000;
 
 const SYSTEM = `You are the official AI intake agent for Credit Counsel Elite, a premium credit repair service operated by Brandon. You are as knowledgeable as Brandon himself — warm, authoritative, and genuinely invested in every client's success. You guide clients through the entire process from intake to fix packet generation.
 
@@ -341,6 +354,7 @@ export default function App() {
 
   // Save client to Supabase
   async function saveClient(data) {
+    if (!supabase) return null;
     try {
       const { data: client, error } = await supabase
         .from("clients")
@@ -366,6 +380,7 @@ export default function App() {
 
   // Save package to Supabase
   async function savePackage(cid, data) {
+    if (!supabase) return;
     try {
       const { error } = await supabase
         .from("packages")
@@ -388,6 +403,7 @@ export default function App() {
 
   // Upload file to Supabase Storage
   async function uploadToSupabase(file, cid) {
+    if (!supabase) return null;
     try {
       const ext = file.name.split(".").pop();
       const path = `${cid}/${Date.now()}_${file.name}`;
@@ -457,6 +473,18 @@ export default function App() {
         ? { type: "text", text: `[${b.type} was uploaded earlier and already read — extracted data is in CONFIRMED CLIENT STATE]` }
         : b
     );
+  }
+
+  // Strip heavy attachments from EVERY message — used to recover from an oversized
+  // payload so the client can never get stuck in a 413 loop.
+  function lightenAll(hist) {
+    return hist.map(m => ({ ...m, content: lighten(m.content) }));
+  }
+
+  // Approximate byte size of an outgoing request body, for pre-flight size checks.
+  function bodySize(msgs) {
+    try { return JSON.stringify({ system: buildSystem(), messages: msgs }).length; }
+    catch { return Infinity; }
   }
 
   async function callAPI(msgs, maxTok = 900) {
@@ -552,7 +580,12 @@ export default function App() {
       }
     } catch (e) {
       console.error("send error:", e.message);
-      setMessages(prev => [...prev, { from: "agent", text: "Error: " + e.message + "\n\nPlease screenshot this and send to support." }]);
+      if (e.message.includes("413")) {
+        setHistory(prev => lightenAll(prev));
+        setMessages(prev => [...prev, { from: "agent", text: "The conversation got too large to send — usually a big attachment. I've cleared cached file data from our active chat (your documents are still saved in storage). Please send your last message again and we'll keep going." }]);
+      } else {
+        setMessages(prev => [...prev, { from: "agent", text: "Error: " + e.message + "\n\nPlease screenshot this and send to support." }]);
+      }
     }
     setBusy(false);
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -583,8 +616,8 @@ export default function App() {
 
     const blocks = [];
     for (const fd of fileData) {
-      // Only send files under 4MB to AI — larger ones just get stored in Supabase
-      if (fd.size > 4 * 1024 * 1024) {
+      // Only send reasonably-sized files to the AI; larger ones live in Supabase only.
+      if (fd.size > 3 * 1024 * 1024) {
         blocks.push({ type: "text", text: `File "${fd.name}" (${Math.round(fd.size/1024/1024)}MB) has been saved to secure storage. It is too large to read automatically — please tell me the key information from this document.` });
       } else if (fd.type === "application/pdf") {
         blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: fd.data.split(",")[1] } });
@@ -593,14 +626,27 @@ export default function App() {
       }
     }
     blocks.push({ type: "text", text: `I uploaded: ${files.map(f => f.name).join(", ")}. Please read carefully, extract all info, tell me what you found, and ask for anything still needed.` });
-    const newHist = [...history, { role: "user", content: blocks }];
+
+    // Pre-flight: keep the request under Vercel's body limit so it can't 413.
+    let userBlocks = blocks;
+    let newHist = [...history, { role: "user", content: userBlocks }];
+    if (bodySize(newHist) > SAFE_BODY_LIMIT) {
+      // 1) Drop the weight of earlier turns first.
+      newHist = [...lightenAll(history), { role: "user", content: userBlocks }];
+    }
+    if (bodySize(newHist) > SAFE_BODY_LIMIT) {
+      // 2) The new file itself is too big — keep it in storage, send only a note.
+      userBlocks = [{ type: "text", text: `I uploaded ${files.map(f => f.name).join(", ")}, but it is too large for me to read automatically. It is saved securely in storage — I will provide the key details by typing them.` }];
+      newHist = [...lightenAll(history), { role: "user", content: userBlocks }];
+      setMessages(prev => [...prev, { from: "agent", text: "That file is a bit large for automatic reading, but it's saved securely. Upload a smaller PDF or a JPG screenshot of the report, or just type the key details — and we'll keep moving." }]);
+    }
     setHistory(newHist);
     try {
       const txt = await callAPI(newHist, 4000);
       const { clean, state } = extractState(txt);
       applyState(state);
       // Store a lightened copy so the raw file isn't re-sent on every later turn.
-      const lightHist = [...history, { role: "user", content: lighten(blocks) }];
+      const lightHist = [...lightenAll(history), { role: "user", content: lighten(userBlocks) }];
       const updHist = [...lightHist, { role: "assistant", content: clean }];
       setHistory(updHist);
       if (clean.includes("PACKAGE_READY:")) {
@@ -616,13 +662,13 @@ export default function App() {
         setStatusTxt("Documents read — continuing intake");
       }
     } catch (e) {
-      // Remove the failed upload from history so client can try again
-      setHistory(history);
+      // Self-heal: strip all heavy attachments so the client is never stuck in a loop.
+      setHistory(lightenAll(history));
       setUploads(prev => prev.slice(0, -files.length));
       if (e.message.includes("413")) {
-        setMessages(prev => [...prev, { from: "agent", text: "⚠️ That file is too large. Please try compressing the PDF first, or take a screenshot of your credit report and upload it as a JPG image instead. Then try again." }]);
+        setMessages(prev => [...prev, { from: "agent", text: "⚠️ That file was too large to process, so I've cleared it from our active chat — it's still saved in your storage. Try a smaller PDF or a JPG screenshot of the report, or just type the key details and we'll continue." }]);
       } else {
-        setMessages(prev => [...prev, { from: "agent", text: "I had trouble reading that file. Please try again or type the information manually." }]);
+        setMessages(prev => [...prev, { from: "agent", text: "I had trouble reading that file. I've cleared it so we can keep going — please try again with a smaller file, or type the information manually." }]);
       }
     }
     setBusy(false);
