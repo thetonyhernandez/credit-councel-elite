@@ -290,6 +290,18 @@ When you have client name, address, DOB, last 4 SSN, disputed items, and FTC rep
 PACKAGE_READY:
 {"clientName":"[full name]","clientAddress":"[full address]","dob":"[dob]","ssn4":"[last 4]","ftcNumber":"[FTC report number]","equifax":"[complete fully-filled Equifax cover letter — written as if handwritten, warm personal tone, filled with real client info and real disputed items for Equifax only]","experian":"[complete Experian cover letter]","transunion":"[complete TransUnion cover letter]","personalInfo":"[complete personal info correction letter filled with client details]","handwrittenNote":"[Instructions for client: Copy this letter by hand word for word on plain white paper. Use blue or black pen. Your handwriting is important — it shows the bureaus this is personal and not from a credit repair company. Do not type it.]","ftcGuide":"[Complete personalized step-by-step FTC filing guide based on THEIR specific disputed items, with exact wording for their personal statement]","disputeItems":{"equifax":["item1 — creditor, type, date"],"experian":["item1"],"transunion":["item1"]},"checklist":["Complete MyFreeScoreNow credit report (first pages through summary + all disputed account pages + inquiry pages — highlight in yellow or blue, NO pink)","Government-issued photo ID — all 4 corners visible, no dark/light spots","Social Security card — all 4 corners visible","Proof of current address — utility bill or bank statement, date cropped out, within 30 days","FTC Identity Theft Report — ALL pages including any blank pages","Affidavit (Identity Theft Victim Complaint) — notarized, signed, specific to this bureau","FCRA 605B PDF document","Police Report (optional but strengthens packet)"],"packetOrder":"1. Cover Letter (handwritten) → 2. Personal Info Letter (OPTIONAL — only if personal info needs correction) → 3. ID Page → 4. Credit Report Pages → 5. FTC Report → 6. Police Report (optional) → 7. Affidavit (notarized) → 8. FCRA 605B PDF","brandonsNotes":"[2-3 sentences for Brandon flagging anything unusual, items that need double-checking, or client-specific notes]"}
 
+═══════════════════════════════════════════
+DOCUMENTS & IMAGES TO COLLECT (actively ask for these during intake)
+═══════════════════════════════════════════
+You MUST collect all of the following from the client before a package can be finalized. Ask for them naturally, ONE at a time, and tell them they can upload a photo or scan right here in the chat using the upload button below the message box. Record each in CONFIRMED CLIENT STATE under "documentsReceived" and never ask twice for one already received.
+1. Credit report — MyFreeScoreNow (primary source). Needed to identify the items to block.
+2. Government-issued photo ID — clear photo, all four corners visible, no glare or dark spots.
+3. Social Security card — clear photo, all four corners visible.
+4. Proof of current address — utility bill or bank statement within 30 days, with the date area cropped out; show only name, company, and address.
+5. FTC Identity Theft Report — filed at IdentityTheft.gov; you need the FTC report number. If they have not filed yet, walk them through it step by step (use the FTC guide), then have them save the PDF and upload it.
+6. Police report (optional) — strengthens the packet if they have one.
+As each image or PDF arrives, confirm what you can see, extract the details into state, then move to the next missing item. Once the credit report, photo ID, Social Security card, proof of address, and FTC report number are all present, you have what you need — generate the full package (a complete cover letter for EACH of the three bureaus, plus the personal info letter if needed, the FTC guide, the checklist, and the packet order) via the PACKAGE_READY block.
+
 CONVERSATION RULES:
 - You are as knowledgeable as Brandon — answer any credit question with confidence and accuracy
 - Be warm, encouraging, professional — this is a high-ticket service
@@ -679,6 +691,99 @@ export default function App() {
     navigator.clipboard.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(""), 2200); });
   }
 
+  // Load jsPDF on demand from CDN (no build dependency needed).
+  function loadJsPDF() {
+    return new Promise((resolve, reject) => {
+      if (window.jspdf?.jsPDF) return resolve(window.jspdf.jsPDF);
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      s.onload = () => window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(new Error("jsPDF unavailable"));
+      s.onerror = () => reject(new Error("Failed to load PDF library"));
+      document.body.appendChild(s);
+    });
+  }
+
+  // Build one complete, mailable PDF for a single bureau: cover letter (to handwrite),
+  // personal info letter (if any), packet assembly order + checklist, and FTC guide.
+  async function genBureauPDF(bureauKey) {
+    const b = BUREAUS.find(x => x.key === bureauKey);
+    if (!pkg || !b || !pkg[bureauKey]) return;
+    try {
+      setStatusTxt(`Building ${b.label} PDF…`);
+      const JsPDF = await loadJsPDF();
+      const doc = new JsPDF({ unit: "pt", format: "letter" });
+      const M = 56, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), maxW = W - M * 2;
+      let y = M;
+      const room = (lh) => { if (y + lh > H - M) { doc.addPage(); y = M; } };
+      const heading = (txt, color) => {
+        room(30); doc.setFont("times", "bold"); doc.setFontSize(15); doc.setTextColor(color || "#0f172a");
+        doc.text(txt, M, y); y += 10; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 18; doc.setTextColor("#111111");
+      };
+      const para = (txt, size = 11, lh = 16, style = "normal") => {
+        doc.setFont("times", style); doc.setFontSize(size); doc.setTextColor("#111111");
+        doc.splitTextToSize(String(txt || ""), maxW).forEach(line => { room(lh); doc.text(line, M, y); y += lh; });
+      };
+      const banner = (txt, bg, fg) => {
+        room(34); doc.setFillColor(bg); doc.roundedRect(M, y - 12, maxW, 28, 4, 4, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(fg);
+        doc.splitTextToSize(txt, maxW - 20).forEach((ln, i) => doc.text(ln, M + 10, y + 4 + i * 12));
+        y += 34; doc.setTextColor("#111111");
+      };
+      // Title
+      doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(b.color);
+      doc.text("Credit Counsel Elite", M, y); y += 22;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor("#64748b");
+      doc.text(`${b.label} Dispute Package — ${pkg.clientName || ""}`, M, y); y += 14;
+      doc.text(new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), M, y); y += 26;
+      // Cover letter
+      heading(`Cover Letter — ${b.label}`, b.color);
+      banner("HANDWRITE THIS — copy it word for word in blue or black ink on plain white paper. Your handwriting defeats the bureaus' credit-repair-company detection.", "#f3e8ff", "#6b21a8");
+      para(pkg[bureauKey], 11, 16);
+      // Personal info letter (optional)
+      if (pkg.personalInfo) {
+        doc.addPage(); y = M;
+        heading("Personal Information Correction Letter", "#374151");
+        banner("This letter may be typed and printed.", "#eef2ff", "#3730a3");
+        para(pkg.personalInfo, 11, 16);
+      }
+      // Packet order + checklist
+      doc.addPage(); y = M;
+      heading("Mail Packet — Assembly Order", "#059669");
+      if (pkg.packetOrder) { para(pkg.packetOrder, 11, 18); y += 6; }
+      if (pkg.checklist?.length) { heading("Document Checklist", "#059669"); pkg.checklist.forEach(it => para("•  " + it, 10.5, 15)); }
+      // FTC guide
+      if (pkg.ftcGuide) { doc.addPage(); y = M; heading("FTC Identity Theft Report — Filing Guide", "#D97706"); para(pkg.ftcGuide, 10.5, 15); }
+      const safe = (pkg.clientName || "client").replace(/[^a-z0-9]+/gi, "_");
+      doc.save(`CCE_${b.label}_${safe}.pdf`);
+      setStatusTxt("PDF downloaded");
+    } catch (e) {
+      console.error("genBureauPDF error:", e.message);
+      printBureau(bureauKey); // dependency-free fallback: browser "Save as PDF"
+    }
+  }
+
+  // Fallback: open a clean print window for one bureau (use the browser's Save as PDF).
+  function printBureau(bureauKey) {
+    const b = BUREAUS.find(x => x.key === bureauKey);
+    if (!b || !pkg?.[bureauKey]) return;
+    let body = `<div class="sec"><h2 style="color:${b.color}">Cover Letter — ${b.label}</h2><div class="banner">HANDWRITE THIS — copy it word for word in blue or black ink on plain white paper.</div><pre>${pkg[bureauKey] || ""}</pre></div>`;
+    if (pkg.personalInfo) body += `<div class="pb"></div><div class="sec"><h2>Personal Information Correction Letter</h2><pre>${pkg.personalInfo}</pre></div>`;
+    body += `<div class="pb"></div><div class="sec"><h2 style="color:#059669">Mail Packet — Assembly Order</h2><pre>${pkg.packetOrder || ""}</pre>`;
+    if (pkg.checklist?.length) body += `<h3>Document Checklist</h3><ul>${pkg.checklist.map(c => `<li>${c}</li>`).join("")}</ul>`;
+    body += `</div>`;
+    if (pkg.ftcGuide) body += `<div class="pb"></div><div class="sec"><h2 style="color:#D97706">FTC Filing Guide</h2><pre>${pkg.ftcGuide}</pre></div>`;
+    const w = window.open("", "_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>CCE — ${b.label} Package</title><style>body{font-family:Georgia,serif;max-width:740px;margin:40px auto;padding:0 24px;color:#111;line-height:1.85}h1{color:${b.color};margin-bottom:2px}.sub{color:#888;font-size:12px;margin-bottom:28px}h2{border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin:0 0 14px}h3{margin:18px 0 6px}.sec{margin-bottom:40px}.pb{page-break-after:always}.banner{background:#f3e8ff;color:#6b21a8;font-family:Arial;font-size:11px;font-weight:bold;padding:8px 12px;border-radius:6px;margin-bottom:14px}pre{white-space:pre-wrap;font-size:12px;line-height:1.9;font-family:Georgia,serif}ul{line-height:2.1;font-size:12px}@media print{.pb{page-break-after:always}}</style></head><body><h1>Credit Counsel Elite</h1><div class="sub">${b.label} Dispute Package — ${pkg.clientName || ""} — ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>${body}</body></html>`);
+    w.document.close(); setTimeout(() => w.print(), 400);
+  }
+
+  // Download a separate PDF for each of the three bureaus.
+  async function downloadAllPDFs() {
+    for (const b of BUREAUS) {
+      if (pkg?.[b.key]) { await genBureauPDF(b.key); await new Promise(r => setTimeout(r, 500)); }
+    }
+  }
+
   function printAll() {
     if (!pkg) return;
     const w = window.open("", "_blank");
@@ -917,21 +1022,31 @@ export default function App() {
                 </div>
 
                 {/* Footer */}
-                <div style={{ padding: "12px 16px 16px", borderTop: "1px solid #f1f5f9", display: "flex", gap: 8, flexShrink: 0 }}>
-                  {docTab !== "checklist" && (
-                    <button onClick={() => copyText(pkg[docTab] || "", docTab)} className="action-btn" style={{ flex: 1, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#fff", border: "1.5px solid #e2e8f0", color: "#374151" }}>
-                      {copied === docTab ? "✓ Copied" : "Copy"}
+                <div style={{ padding: "12px 16px 16px", borderTop: "1px solid #f1f5f9", display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {docTab !== "checklist" && (
+                      <button onClick={() => copyText(pkg[docTab] || "", docTab)} className="action-btn" style={{ flex: 1, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#fff", border: "1.5px solid #e2e8f0", color: "#374151" }}>
+                        {copied === docTab ? "✓ Copied" : "Copy"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => (BUREAUS.some(b => b.key === docTab) ? genBureauPDF(docTab) : downloadAllPDFs())}
+                      className="action-btn"
+                      style={{ flex: 2, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#0f766e", border: "none", color: "#fff" }}>
+                      ⬇ {BUREAUS.some(b => b.key === docTab) ? `Download ${BUREAUS.find(b => b.key === docTab)?.label} PDF` : "Download all 3 bureau PDFs"}
                     </button>
-                  )}
-                  {!approved ? (
-                    <button onClick={() => setShowReview(true)} style={{ flex: 2, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#fef3c7", border: "1.5px solid #fde68a", color: "#92400e" }}>
-                      ⚡ Brandon — Review
-                    </button>
-                  ) : (
-                    <button onClick={printAll} className="action-btn" style={{ flex: 2, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#1e3a8a", border: "none", color: "#fff" }}>
-                      Print / Save PDF ✓
-                    </button>
-                  )}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {!approved ? (
+                      <button onClick={() => setShowReview(true)} style={{ flex: 1, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#fef3c7", border: "1.5px solid #fde68a", color: "#92400e" }}>
+                        ⚡ Brandon — Review
+                      </button>
+                    ) : (
+                      <button onClick={printAll} className="action-btn" style={{ flex: 1, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#1e3a8a", border: "none", color: "#fff" }}>
+                        Print full package ✓
+                      </button>
+                    )}
+                  </div>
                 </div>
               </>
             )}
