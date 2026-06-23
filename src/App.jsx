@@ -293,13 +293,15 @@ As each image or PDF arrives, confirm what you can see, extract the details into
 
 CONVERSATION RULES:
 - You are as knowledgeable as Brandon — answer any credit question with confidence and accuracy
-- Be warm, encouraging, professional — this is a high-ticket service
-- Use client's first name once you have it
-- Ask ONE question at a time
-- After reading any uploaded document: immediately summarize what you found
+- TONE: precise, clear, elegant, professional. Write in short plain sentences. Never use emojis, decorative symbols, or exclamation-heavy hype. No clutter. Clarity above everything.
+- Keep each reply brief: a one-line confirmation of what you received, then the single next step.
+- Use the client's first name once you have it
+- Ask ONE thing at a time and make it obvious what to do next
+- DOCUMENTS ARE THE PRIORITY. Your purpose is to build the three packages, and the packages are built from the uploaded documents. Lead every step by requesting the actual files (photo ID, passport, electric/utility bill, credit report PDF, FTC report PDF, affidavit). You may confirm the SSN once, but do not get stuck collecting typed data — drive toward collecting the documents.
+- After reading any uploaded document: state plainly what you found in one or two lines, then ask for the next document.
 - Never re-ask for info already provided or extracted from documents
-- Guide them step by step — they should feel supported, not overwhelmed
-- If they ask questions about the process, answer fully and accurately using Brandon's exact methodology
+- Guide them step by step so the path is obvious and calm, never overwhelming
+- If they ask about the process, answer fully and accurately using Brandon's exact methodology
 - Never say "dispute" when referring to what we're doing — say "block" or "remove" under 605B identity theft rights
 
 ═══════════════════════════════════════════
@@ -607,7 +609,7 @@ export default function App() {
           // Save client + package to Supabase
           const cid = clientId || await saveClient(json);
           if (cid) await savePackage(cid, json);
-          setMessages(prev => [...prev, { from: "agent", text: `Your complete 3-bureau dispute package is ready, ${json.clientName?.split(" ")[0] || ""}! Tap "Package" above to review all letters. Brandon will do a quick review before you print and mail. You're almost there 💪` }]);
+          setMessages(prev => [...prev, { from: "agent", text: `Your three dispute packages are ready, ${json.clientName?.split(" ")[0] || ""}. Open the Package tab to review the letters. Brandon will review before you print and mail.` }]);
           setTimeout(() => { setTab(1); setShowReview(true); }, 1800);
         } catch { setMessages(prev => [...prev, { from: "agent", text: clean.replace("PACKAGE_READY:", "").trim() }]); }
       } else {
@@ -702,7 +704,7 @@ export default function App() {
         try {
           const json = JSON.parse(clean.split("PACKAGE_READY:")[1].trim());
           setPkg(json); setProgress(100); setStatusTxt("Package complete");
-          setMessages(prev => [...prev, { from: "agent", text: `Package auto-generated from your documents! Tap "Package" above to review.` }]);
+          setMessages(prev => [...prev, { from: "agent", text: `Packages generated from your documents. Open the Package tab to review.` }]);
           setTimeout(() => { setTab(1); setShowReview(true); }, 1400);
         } catch { setMessages(prev => [...prev, { from: "agent", text: clean.replace("PACKAGE_READY:", "").trim() }]); }
       } else {
@@ -715,7 +717,7 @@ export default function App() {
       setHistory(lightenAll(history));
       setUploads(prev => prev.slice(0, -files.length));
       if (e.message.includes("413")) {
-        setMessages(prev => [...prev, { from: "agent", text: "⚠️ That file was too large to process, so I've cleared it from our active chat — it's still saved in your storage. Try a smaller PDF or a JPG screenshot of the report, or just type the key details and we'll continue." }]);
+        setMessages(prev => [...prev, { from: "agent", text: "That file was too large to process, so I cleared it from our chat. It is still saved in your storage. Upload a smaller PDF or a photo of the report, or type the key details and we will continue." }]);
       } else {
         setMessages(prev => [...prev, { from: "agent", text: "I had trouble reading that file. I've cleared it so we can keep going — please try again with a smaller file, or type the information manually." }]);
       }
@@ -766,7 +768,8 @@ export default function App() {
     return null;
   }
 
-  // The per-bureau letters that lead the packet: cover letter + personal info letter.
+  // The per-bureau letters that lead the packet: a blank page for the client's
+  // handwritten cover letter, then the typed cover letter and personal info letter.
   function buildLettersDoc(bureauKey, JsPDF) {
     const b = BUREAUS.find(x => x.key === bureauKey);
     const doc = new JsPDF({ unit: "pt", format: "letter" });
@@ -775,12 +778,18 @@ export default function App() {
     const room = (lh) => { if (y + lh > H - M) { doc.addPage(); y = M; } };
     const heading = (txt, color) => { room(30); doc.setFont("times", "bold"); doc.setFontSize(15); doc.setTextColor(color || "#0f172a"); doc.text(txt, M, y); y += 10; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 18; doc.setTextColor("#111111"); };
     const para = (txt, size = 11, lh = 16) => { doc.setFont("times", "normal"); doc.setFontSize(size); doc.setTextColor("#111111"); doc.splitTextToSize(String(txt || ""), maxW).forEach(line => { room(lh); doc.text(line, M, y); y += lh; }); };
-    const banner = (txt, bg, fg) => { room(34); doc.setFillColor(bg); doc.roundedRect(M, y - 12, maxW, 28, 4, 4, "F"); doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(fg); doc.splitTextToSize(txt, maxW - 20).forEach((ln, i) => doc.text(ln, M + 10, y + 4 + i * 12)); y += 34; doc.setTextColor("#111111"); };
+
+    // Page 1 — intentionally blank for the client's handwritten cover letter.
+    doc.setFont("times", "italic"); doc.setFontSize(9); doc.setTextColor("#cbd5e1");
+    doc.text("Handwrite your cover letter on this page.", M, M);
+    doc.setTextColor("#111111");
+
+    // Page 2 — typed cover letter (unchanged wording).
+    doc.addPage(); y = M;
     doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(b.color); doc.text("Credit Counsel Elite", M, y); y += 22;
     doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor("#64748b"); doc.text(`${b.label} Dispute Package — ${pkg.clientName || ""}`, M, y); y += 14;
     doc.text(new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), M, y); y += 26;
     heading(`Cover Letter — ${b.label}`, b.color);
-    banner("HANDWRITE THIS — copy it word for word in blue or black ink on plain white paper. Your handwriting defeats the bureaus' credit-repair-company detection.", "#f3e8ff", "#6b21a8");
     para(pkg[bureauKey], 11, 16);
     if (pkg.personalInfo) { doc.addPage(); y = M; heading("Personal Information Correction Letter", "#374151"); para(pkg.personalInfo, 11, 16); }
     return doc;
@@ -885,9 +894,9 @@ export default function App() {
   const docTabs = [
     ...BUREAUS.map(b => ({ key: b.key, label: b.label, color: b.color })),
     { key: "personalInfo",    label: "Personal Info",  color: "#374151" },
-    { key: "handwrittenNote", label: "✍️ Handwritten", color: "#7C3AED" },
+    { key: "handwrittenNote", label: "Handwritten", color: "#7C3AED" },
     { key: "ftcGuide",        label: "FTC Guide",      color: "#D97706" },
-    { key: "documents",       label: "📎 Documents",   color: "#0f766e" },
+    { key: "documents",       label: "Documents",   color: "#0f766e" },
     { key: "checklist",       label: "Checklist",      color: "#059669" },
   ];
 
@@ -1115,10 +1124,10 @@ export default function App() {
                     </div>
                   ) : docTab === "handwrittenNote" ? (
                     <div style={{ padding: "20px 18px" }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>✍️ Your Handwritten Cover Letter</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Your Handwritten Cover Letter</div>
                       <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14, lineHeight: 1.6 }}>Copy this letter word for word on plain white paper using blue or black pen. Your handwriting defeats bureau detection systems that flag credit repair company templates.</div>
                       <div style={{ background: "#fdf4ff", border: "1px solid #e9d5ff", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>⚠️ Important Instructions</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>Important Instructions</div>
                         <div style={{ fontSize: 12, color: "#6b21a8", lineHeight: 1.65 }}>{pkg?.handwrittenNote || "Write this letter by hand. Do not type or print it. Use plain white paper and blue or black ink."}</div>
                       </div>
                       <pre style={{ fontSize: 12, lineHeight: 2, color: "#374151", whiteSpace: "pre-wrap", fontFamily: "Georgia, serif", margin: 0, background: "#fffbeb", padding: 16, borderRadius: 10, border: "1px solid #fde68a" }}>{pkg?.equifax || ""}</pre>
