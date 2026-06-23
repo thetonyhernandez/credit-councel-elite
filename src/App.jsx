@@ -273,7 +273,11 @@ Step 5 — Generate full package
 OUTPUT FORMAT
 ═══════════════════════════════════════════
 
-When you have client name, address, DOB, last 4 SSN, disputed items, and FTC report number, output EXACTLY this (nothing before or after). The three bureau cover letters MUST be the exact COVER LETTER template reproduced word for word — same sentences, same order — only the bureau name/address, the client's info, and the numbered "N.CREDITOR MM/DD/YYYY" account lines change:
+When you have the client name, address, DOB, SSN, disputed items, and FTC report number, you MUST generate the packages by outputting the PACKAGE_READY block below.
+
+CRITICAL: The packages do not exist until you output this block. The block is the ONLY thing that builds the PDFs. NEVER tell the client their packages are "ready", "built", or "in the Package tab" unless THIS SAME REPLY contains the PACKAGE_READY block. Do not describe, summarize, or promise the packages — output the block itself. Do not write any sentence claiming the work is done in place of the block. If the client asks for the PDFs or to generate/build the packages and you have the required info, output the PACKAGE_READY block immediately. The app shows the client the result and the download buttons; you do not narrate it.
+
+Output EXACTLY this (the JSON block, nothing before or after it except your normal short reply text if a question remains). The three bureau cover letters MUST be the exact COVER LETTER template reproduced word for word — same sentences, same order — only the bureau name/address, the client's info, and the numbered "N.CREDITOR MM/DD/YYYY" account lines change:
 
 PACKAGE_READY:
 {"clientName":"[full name]","clientAddress":"[full address]","dob":"[dob]","ssn4":"[last 4]","ftcNumber":"[FTC report number]","equifax":"[the COVER LETTER template reproduced verbatim, addressed to Equifax with Equifax's hard-coded address, accounts as numbered N.CREDITOR MM/DD/YYYY lines]","experian":"[same verbatim cover letter, addressed to Experian]","transunion":"[same verbatim cover letter, addressed to TransUnion]","personalInfo":"[the PERSONAL INFORMATION CORRECTION LETTER reproduced verbatim, filled with client details — only if personal info is incorrect on the report]","handwrittenNote":"[Instructions for client: Copy this letter by hand word for word on plain white paper. Use blue or black pen. Your handwriting is important — it shows the bureaus this is personal and not from a credit repair company. Do not type it.]","ftcGuide":"[Complete personalized step-by-step FTC filing guide based on THEIR specific disputed items, with exact wording for their personal statement]","disputeItems":{"equifax":["item1 — creditor, type, date"],"experian":["item1"],"transunion":["item1"]},"checklist":["Complete MyFreeScoreNow credit report (first pages through summary + all disputed account pages + inquiry pages — highlight in yellow or blue, NO pink)","Government-issued photo ID — all 4 corners visible, no dark/light spots","Social Security card — all 4 corners visible","Proof of current address — utility bill or bank statement, date cropped out, within 30 days","FTC Identity Theft Report — ALL pages including any blank pages","Affidavit (Identity Theft Victim Complaint) — notarized, signed, specific to this bureau","FCRA 605B PDF document","Police Report (optional but strengthens packet)"],"packetOrder":"1. Cover Letter (handwritten) → 2. Personal Info Letter (OPTIONAL — only if personal info needs correction) → 3. ID Page → 4. Credit Report Pages → 5. FTC Report → 6. Police Report (optional) → 7. Affidavit (notarized) → 8. FCRA 605B PDF","brandonsNotes":"[2-3 sentences for Brandon flagging anything unusual, items that need double-checking, or client-specific notes]"}
@@ -311,7 +315,7 @@ CONVERSATION RULES:
 - Keep each reply brief: a one-line confirmation of what you received, then the single next step.
 - Use the client's first name once you have it
 - Ask ONE thing at a time and make it obvious what to do next
-- NEVER say you cannot generate or export a PDF, and never give manual PDF steps (no ilovepdf, no PDF24, no "merge"/"combine"/"print and assemble"). The app generates a complete, downloadable PDF for each bureau automatically from the uploaded documents. Your job is to collect the documents, read them, confirm the details, and emit the PACKAGE_READY block. After that, simply tell the client their three packages are ready in the Package tab to download.
+- NEVER say you cannot generate or export a PDF, and never give manual PDF steps (no ilovepdf, no PDF24, no "merge"/"combine"/"print and assemble"). The app generates a complete, downloadable PDF for each bureau automatically from the PACKAGE_READY block you output. To finish, you must OUTPUT THE PACKAGE_READY BLOCK — that is what builds the PDFs. Never claim the packages are ready unless that block is in the same reply. Do not narrate completion; the app shows the client the download buttons.
 - NEVER ask the client to type their Social Security number, date of birth, name, or address. Every one of these is on the documents they upload — the SSN card, FTC report, affidavit, and credit report all show the full SSN; the ID and bill show the name and address. Read these values from the documents, then show the client what you extracted and ask only if it is correct.
 - DOCUMENTS ARE THE PRIORITY. Your purpose is to build the three packages, and the packages are built from the uploaded documents. Lead every step by requesting the actual files (photo ID, passport, electric/utility bill, credit report PDF, FTC report PDF, affidavit), read the details off them, and confirm. Do not get stuck collecting typed data.
 - After reading any uploaded document: state plainly what you found in one or two lines, then ask for the next document.
@@ -686,9 +690,15 @@ export default function App() {
     setProgress(Math.min(85, 8 + turns * 10));
     if (turns === 1) setStatusTxt("Collecting personal info");
     else if (turns === 3) setStatusTxt("Gathering dispute details");
-    else if (turns >= 5) setStatusTxt("Finalizing package...");
+    else if (turns >= 5) setStatusTxt("Reviewing your documents");
+    // If the client is asking for the packages/PDFs and none exist yet, force the model
+    // to output the PACKAGE_READY block on this turn instead of just talking about it.
+    const wantsPkg = !pkg && /\b(generate|pdf|pdfs|package|packages|build|create|finish|finaliz|download)\b/i.test(text);
+    const histForApi = wantsPkg
+      ? [...history, { role: "user", content: text + "\n\n(System: All required client info and documents are collected. Output the PACKAGE_READY block now — the JSON block that builds the three packages. Do NOT reply with prose saying the packages are ready; output the block itself.)" }]
+      : newHist;
     try {
-      const txt = await callAPI(newHist, 8000);
+      const txt = await callAPI(histForApi, 8000);
       const { clean, state } = extractState(txt);
       applyState(state);
       const updHist = [...newHist, { role: "assistant", content: clean }];
@@ -705,11 +715,12 @@ export default function App() {
           setMessages(prev => [...prev, { from: "agent", text: `Your three packages are ready, ${json.clientName?.split(" ")[0] || ""}. Open the Package tab to review and download each bureau's PDF. Brandon will review before you print and mail.` }]);
           setTimeout(() => { setTab(1); setShowReview(true); }, 1800);
         } else {
-          setProgress(85); setStatusTxt("Finalizing package…");
+          setProgress(80); setStatusTxt("Ready to generate");
           setMessages(prev => [...prev, { from: "agent", text: "I have everything I need. Reply \"generate\" and I will build your three packages." }]);
         }
       } else {
         setMessages(prev => [...prev, { from: "agent", text: clean }]);
+        if (statusTxt === "Reviewing your documents") setStatusTxt("Intake in progress");
       }
     } catch (e) {
       console.error("send error:", e.message);
