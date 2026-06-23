@@ -17,6 +17,8 @@ try {
 
 // Vercel serverless requests are capped near 4.5MB; stay safely under it to avoid 413s.
 const SAFE_BODY_LIMIT = 4000000;
+// Key for saving a client's in-progress session on their device so they can resume.
+const SESSION_KEY = "cce_session_v1";
 
 const SYSTEM = `You are the official AI intake agent for Credit Counsel Elite, a premium credit repair service operated by Brandon. You are as knowledgeable as Brandon himself — warm, authoritative, and genuinely invested in every client's success. You guide clients through the entire process from intake to fix packet generation.
 
@@ -400,6 +402,7 @@ export default function App() {
   const [clientId,    setClientId]    = useState(null);
   const [profile,     setProfile]     = useState(null);
   const profileRef                    = useRef(null);
+  const [restored,    setRestored]    = useState(false);
 
   // Save client to Supabase
   async function saveClient(data) {
@@ -484,7 +487,60 @@ export default function App() {
   const ready     = !!pkg;
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
-  useEffect(() => { initAgent(); }, []);
+
+  // On load: resume this client's saved progress if any; otherwise start a fresh intake.
+  useEffect(() => {
+    let didRestore = false;
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s && Array.isArray(s.messages) && s.messages.length) {
+          setMessages(s.messages);
+          setHistory(Array.isArray(s.history) ? s.history : []);
+          if (s.profile) { profileRef.current = s.profile; setProfile(s.profile); }
+          if (s.pkg) setPkg(s.pkg);
+          if (s.slots) setSlots(s.slots);
+          if (Array.isArray(s.docFiles)) setDocFiles(s.docFiles);
+          if (Array.isArray(s.uploads)) setUploads(s.uploads);
+          if (typeof s.progress === "number") setProgress(s.progress);
+          if (s.statusTxt) setStatusTxt(s.statusTxt);
+          if (s.approved) setApproved(true);
+          if (s.clientId) setClientId(s.clientId);
+          didRestore = true;
+        }
+      }
+    } catch (e) { console.error("restore error:", e.message); }
+    setRestored(true);
+    if (!didRestore) initAgent();
+  }, []);
+
+  // Autosave progress so a client can close the tab and resume where they left off.
+  useEffect(() => {
+    if (!restored) return;
+    const snap = { v: 1, ts: Date.now(), messages, history, profile: profileRef.current, pkg, slots, docFiles, uploads, progress, statusTxt, approved, clientId };
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
+    } catch {
+      // Storage full — keep the conversation, profile and package; drop heavy file data.
+      try {
+        const lightSlots = {};
+        Object.keys(slots || {}).forEach(k => { const v = slots[k]; lightSlots[k] = v ? { name: v.name, type: v.type } : v; });
+        const lightDocs = (docFiles || []).map(d => ({ name: d.name, type: d.type }));
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ ...snap, slots: lightSlots, docFiles: lightDocs, filesDropped: true }));
+      } catch (e2) { console.error("autosave failed:", e2.message); }
+    }
+  }, [restored, messages, history, pkg, slots, docFiles, uploads, progress, statusTxt, approved, clientId, profile]);
+
+  // Clear saved progress and start a brand-new client on this device.
+  function resetSession() {
+    if (!window.confirm("Start a new client? This clears the current progress saved on this device.")) return;
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
+    setMessages([]); setHistory([]); setPkg(null); setSlots({}); setDocFiles([]);
+    setUploads([]); setProgress(0); setStatusTxt("Ready to begin"); setApproved(false);
+    setClientId(null); setProfile(null); profileRef.current = null; setDocTab("equifax"); setTab(0);
+    initAgent();
+  }
 
   // Pull the model's running memory block out of a reply, parse it, and return
   // the clean text the client should actually see (state block removed).
@@ -954,11 +1010,14 @@ export default function App() {
             <div style={{ color: "#fff", fontWeight: 700, fontSize: 16, letterSpacing: "-.3px" }}>Credit Counsel Elite</div>
             <div style={{ color: "#64748b", fontSize: 10, fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase", marginTop: 1 }}>AI Dispute Agent</div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 20, background: ready ? (approved ? "rgba(16,185,129,.15)" : "rgba(234,179,8,.12)") : "rgba(255,255,255,.06)", border: `1px solid ${ready ? (approved ? "rgba(52,211,153,.25)" : "rgba(234,179,8,.3)") : "rgba(255,255,255,.1)"}` }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: ready ? (approved ? "#34d399" : "#fbbf24") : "#64748b", flexShrink: 0, ...(busy ? { animation: "pulse 1.2s ease infinite" } : {}) }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: ready ? (approved ? "#34d399" : "#fbbf24") : "#94a3b8", letterSpacing: ".2px" }}>
-              {ready ? (approved ? "Approved" : "Pending review") : busy ? "Processing…" : "Intake in progress"}
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button onClick={resetSession} style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", color: "#94a3b8", fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}>New client</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 20, background: ready ? (approved ? "rgba(16,185,129,.15)" : "rgba(234,179,8,.12)") : "rgba(255,255,255,.06)", border: `1px solid ${ready ? (approved ? "rgba(52,211,153,.25)" : "rgba(234,179,8,.3)") : "rgba(255,255,255,.1)"}` }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: ready ? (approved ? "#34d399" : "#fbbf24") : "#64748b", flexShrink: 0, ...(busy ? { animation: "pulse 1.2s ease infinite" } : {}) }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: ready ? (approved ? "#34d399" : "#fbbf24") : "#94a3b8", letterSpacing: ".2px" }}>
+                {ready ? (approved ? "Approved" : "Pending review") : busy ? "Processing…" : "Intake in progress"}
+              </span>
+            </div>
           </div>
         </div>
 
