@@ -650,6 +650,29 @@ export default function App() {
     setTimeout(() => inputRef.current?.focus(), 200);
   }
 
+  // Safely pull the PACKAGE_READY JSON out of a reply. Tolerates code fences and any
+  // trailing text, and returns null if the JSON is incomplete (truncated) — so a raw
+  // or broken JSON blob never leaks into the chat.
+  function parsePackage(clean) {
+    const marker = "PACKAGE_READY:";
+    const i = clean.indexOf(marker);
+    if (i === -1) return null;
+    let after = clean.slice(i + marker.length).trim()
+      .replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "").trim();
+    const start = after.indexOf("{");
+    if (start === -1) return null;
+    let depth = 0, end = -1, inStr = false, esc = false;
+    for (let k = start; k < after.length; k++) {
+      const ch = after[k];
+      if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; }
+      else if (ch === '"') inStr = true;
+      else if (ch === "{") depth++;
+      else if (ch === "}") { depth--; if (depth === 0) { end = k; break; } }
+    }
+    if (end === -1) return null; // truncated — incomplete JSON
+    try { return JSON.parse(after.slice(start, end + 1)); } catch { return null; }
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || busy) return;
@@ -664,24 +687,26 @@ export default function App() {
     else if (turns === 3) setStatusTxt("Gathering dispute details");
     else if (turns >= 5) setStatusTxt("Finalizing package...");
     try {
-      const txt = await callAPI(newHist, 4000);
+      const txt = await callAPI(newHist, 8000);
       const { clean, state } = extractState(txt);
       applyState(state);
       const updHist = [...newHist, { role: "assistant", content: clean }];
       setHistory(updHist);
       if (clean.includes("PACKAGE_READY:")) {
         setProgress(95); setStatusTxt("Generating package…");
-        try {
-          const json = JSON.parse(clean.split("PACKAGE_READY:")[1].trim());
+        const json = parsePackage(clean);
+        if (json) {
           setPkg(json);
           setProgress(100);
           setStatusTxt("Package complete");
-          // Save client + package to Supabase
           const cid = clientId || await saveClient(json);
           if (cid) await savePackage(cid, json);
-          setMessages(prev => [...prev, { from: "agent", text: `Your three dispute packages are ready, ${json.clientName?.split(" ")[0] || ""}. Open the Package tab to review the letters. Brandon will review before you print and mail.` }]);
+          setMessages(prev => [...prev, { from: "agent", text: `Your three packages are ready, ${json.clientName?.split(" ")[0] || ""}. Open the Package tab to review and download each bureau's PDF. Brandon will review before you print and mail.` }]);
           setTimeout(() => { setTab(1); setShowReview(true); }, 1800);
-        } catch { setMessages(prev => [...prev, { from: "agent", text: clean.replace("PACKAGE_READY:", "").trim() }]); }
+        } else {
+          setProgress(85); setStatusTxt("Finalizing package…");
+          setMessages(prev => [...prev, { from: "agent", text: "I have everything I need. Reply \"generate\" and I will build your three packages." }]);
+        }
       } else {
         setMessages(prev => [...prev, { from: "agent", text: clean }]);
       }
@@ -763,7 +788,7 @@ export default function App() {
     }
     setHistory(newHist);
     try {
-      const txt = await callAPI(newHist, 4000);
+      const txt = await callAPI(newHist, 8000);
       const { clean, state } = extractState(txt);
       applyState(state);
       // Store a lightened copy so the raw file isn't re-sent on every later turn.
@@ -771,12 +796,17 @@ export default function App() {
       const updHist = [...lightHist, { role: "assistant", content: clean }];
       setHistory(updHist);
       if (clean.includes("PACKAGE_READY:")) {
-        try {
-          const json = JSON.parse(clean.split("PACKAGE_READY:")[1].trim());
+        const json = parsePackage(clean);
+        if (json) {
           setPkg(json); setProgress(100); setStatusTxt("Package complete");
-          setMessages(prev => [...prev, { from: "agent", text: `Packages generated from your documents. Open the Package tab to review.` }]);
+          const cid = clientId || await saveClient(json);
+          if (cid) await savePackage(cid, json);
+          setMessages(prev => [...prev, { from: "agent", text: `Your three packages are ready. Open the Package tab to review and download each bureau's PDF.` }]);
           setTimeout(() => { setTab(1); setShowReview(true); }, 1400);
-        } catch { setMessages(prev => [...prev, { from: "agent", text: clean.replace("PACKAGE_READY:", "").trim() }]); }
+        } else {
+          setProgress(85); setStatusTxt("Documents read — continuing intake");
+          setMessages(prev => [...prev, { from: "agent", text: "I have read your documents. Reply \"generate\" and I will build your three packages." }]);
+        }
       } else {
         setMessages(prev => [...prev, { from: "agent", text: clean }]);
         setProgress(prev => Math.min(80, prev + 15));
