@@ -389,7 +389,7 @@ const GUIDE = [
   { phase: "Phase 3", color: "#0F172A", title: "Build to 800+ Club", body: "Six boxes must all be green:\n• Payment history: 100% on time\n• Utilization: 0-3%\n• Derogatory remarks: 0\n• Credit age: 9+ years\n• Total accounts: 21+\n• Inquiries: 0 per bureau\n\nAuthorized Users (affects 55% of score):\n• Look for: 9+ years old, under 9% utilization, no derogatory remarks, reports all 3 bureaus\n• Best cards: Chase, BofA, Capital One, Discover, Elan, Barclays\n• Avoid Citibank (only 2 bureaus)\n\nMass Apply Strategy:\n• Only when score is 800+\n• Apply 4-5 cards at a time\n• Each group drops ~20 points — still above 780 threshold\n• 780+ = best rates on everything" },
 ];
 
-export default function App() {
+function ClientApp() {
   const [tab,         setTab]         = useState(0);
   const [messages,    setMessages]    = useState([]);
   const [history,     setHistory]     = useState([]);
@@ -478,6 +478,7 @@ export default function App() {
         client_id: cid,
         file_name: file.name,
         file_url: urlData?.publicUrl || path,
+        storage_path: path,
         file_type: file.type,
         file_size: file.size,
       }]);
@@ -1585,4 +1586,192 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+// ============================================================
+// BRANDON ADMIN DASHBOARD  (hidden — shown only at /admin)
+// ============================================================
+function AdminDashboard() {
+  const [session, setSession] = useState(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authErr, setAuthErr] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [active, setActive] = useState(null);      // selected client row
+  const [pkg, setPkg] = useState(null);            // selected client's latest package
+  const [docs, setDocs] = useState([]);
+  const [letterTab, setLetterTab] = useState("equifax");
+  const [notes, setNotes] = useState("");
+  const [requests, setRequests] = useState("");
+  const [saveMsg, setSaveMsg] = useState("");
+
+  const NAVY = "#0f172a", BLUE = "#1e3a8a", GOLD = "#b58a2e";
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => setSession(data?.session || null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub?.subscription?.unsubscribe?.();
+  }, []);
+
+  useEffect(() => { if (session) loadClients(); }, [session]);
+
+  async function loadClients() {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from("clients").select("*").order("updated_at", { ascending: false });
+      if (error) throw error;
+      setClients(data || []);
+    } catch (e) { console.error("loadClients", e.message); }
+    setLoading(false);
+  }
+
+  async function openClient(c) {
+    setActive(c); setPkg(null); setDocs([]); setLetterTab("equifax");
+    setNotes(c.brandon_notes || ""); setRequests(c.brandon_requests || ""); setSaveMsg("");
+    try {
+      const { data: pkgs } = await supabase.from("packages").select("*").eq("client_id", c.id).order("created_at", { ascending: false }).limit(1);
+      setPkg(pkgs && pkgs[0] ? pkgs[0] : null);
+      const { data: d } = await supabase.from("documents").select("*").eq("client_id", c.id).order("created_at", { ascending: true });
+      setDocs(d || []);
+    } catch (e) { console.error("openClient", e.message); }
+  }
+
+  async function viewDoc(doc) {
+    try {
+      if (doc.storage_path) {
+        const { data, error } = await supabase.storage.from("client-documents").createSignedUrl(doc.storage_path, 3600);
+        if (error) throw error;
+        window.open(data.signedUrl, "_blank");
+      } else if (doc.file_url) {
+        window.open(doc.file_url, "_blank");
+      }
+    } catch (e) { alert("Could not open file: " + e.message); }
+  }
+
+  async function saveReview(newStatus) {
+    if (!active) return;
+    setSaveMsg("Saving…");
+    try {
+      const patch = { brandon_notes: notes, brandon_requests: requests };
+      if (newStatus) patch.status = newStatus;
+      const { error } = await supabase.from("clients").update(patch).eq("id", active.id);
+      if (error) throw error;
+      setSaveMsg("Saved");
+      setActive({ ...active, ...patch });
+      loadClients();
+      setTimeout(() => setSaveMsg(""), 2000);
+    } catch (e) { setSaveMsg("Error: " + e.message); }
+  }
+
+  async function signIn() {
+    setAuthErr(""); setAuthBusy(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) throw error;
+    } catch (e) { setAuthErr(e.message || "Sign in failed"); }
+    setAuthBusy(false);
+  }
+
+  const wrap = { minHeight: "100vh", background: "#f1f5f9", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif", color: NAVY };
+
+  if (!supabase) {
+    return <div style={{ ...wrap, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ textAlign: "center", color: "#64748b" }}>Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.</div>
+    </div>;
+  }
+
+  if (!session) {
+    return <div style={{ ...wrap, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 380, background: "#fff", borderRadius: 16, padding: 32, boxShadow: "0 10px 40px rgba(0,0,0,.08)" }}>
+        <div style={{ fontSize: 20, fontWeight: 800, color: NAVY }}>Credit Counsel Elite</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: GOLD, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 22 }}>Admin Dashboard</div>
+        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" autoComplete="username" style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 14, marginBottom: 10, fontFamily: "inherit" }} />
+        <input value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && signIn()} type="password" placeholder="Password" autoComplete="current-password" style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 14, marginBottom: 14, fontFamily: "inherit" }} />
+        {authErr && <div style={{ color: "#dc2626", fontSize: 12, marginBottom: 12 }}>{authErr}</div>}
+        <button onClick={signIn} disabled={authBusy} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: authBusy ? "#94a3b8" : BLUE, color: "#fff", fontSize: 14, fontWeight: 700, cursor: authBusy ? "not-allowed" : "pointer", fontFamily: "inherit" }}>{authBusy ? "Signing in…" : "Sign in"}</button>
+      </div>
+    </div>;
+  }
+
+  const statusColor = (s) => s === "approved" ? "#16a34a" : s === "changes_requested" ? "#d97706" : "#64748b";
+  const letters = [["equifax", "Equifax"], ["experian", "Experian"], ["transunion", "TransUnion"], ["personal_info", "Personal Info"]];
+
+  return <div style={wrap}>
+    <div style={{ background: NAVY, padding: "14px 22px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div>
+        <span style={{ color: "#fff", fontWeight: 800, fontSize: 16 }}>Credit Counsel Elite</span>
+        <span style={{ color: GOLD, fontWeight: 700, fontSize: 11, letterSpacing: "1.5px", textTransform: "uppercase", marginLeft: 10 }}>Admin</span>
+      </div>
+      <button onClick={() => supabase.auth.signOut()} style={{ background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.15)", color: "#cbd5e1", fontSize: 12, fontWeight: 600, borderRadius: 18, padding: "6px 14px", cursor: "pointer", fontFamily: "inherit" }}>Sign out</button>
+    </div>
+
+    <div style={{ display: "flex", gap: 16, padding: 16, alignItems: "flex-start", maxWidth: 1200, margin: "0 auto", flexWrap: "wrap" }}>
+      {/* Client list */}
+      <div style={{ flex: "1 1 300px", minWidth: 280, background: "#fff", borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>Clients</span>
+          <button onClick={loadClients} style={{ background: "none", border: "none", color: BLUE, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
+        </div>
+        {loading ? <div style={{ padding: 20, color: "#94a3b8", fontSize: 13 }}>Loading…</div>
+          : clients.length === 0 ? <div style={{ padding: 20, color: "#94a3b8", fontSize: 13 }}>No clients yet.</div>
+          : clients.map(c => (
+            <div key={c.id} onClick={() => openClient(c)} style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", cursor: "pointer", background: active?.id === c.id ? "#f8faff" : "#fff" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{c.name || "Unnamed client"}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", color: statusColor(c.status), background: statusColor(c.status) + "1a", padding: "2px 8px", borderRadius: 10, whiteSpace: "nowrap" }}>{(c.status || "intake").replace("_", " ")}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{c.address || "—"}</div>
+            </div>
+          ))}
+      </div>
+
+      {/* Detail */}
+      <div style={{ flex: "2 1 520px", minWidth: 320 }}>
+        {!active ? <div style={{ background: "#fff", borderRadius: 14, padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 14, boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>Select a client to review their package.</div>
+          : <div style={{ background: "#fff", borderRadius: 14, padding: 20, boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800 }}>{active.name || "Unnamed client"}</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>{active.address || "—"}</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>DOB {active.dob || "—"} · SSN ***-**-{active.ssn4 || "—"} · FTC #{active.ftc_number || "—"}</div>
+
+            {/* Documents */}
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Documents ({docs.length})</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+              {docs.length === 0 ? <span style={{ fontSize: 12, color: "#94a3b8" }}>None uploaded.</span>
+                : docs.map(d => <button key={d.id} onClick={() => viewDoc(d)} style={{ fontSize: 12, fontWeight: 600, color: BLUE, background: "#f8faff", border: "1px solid #dbeafe", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>{d.file_name}</button>)}
+            </div>
+
+            {/* Letters */}
+            {pkg ? <>
+              <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #f1f5f9", marginBottom: 12, flexWrap: "wrap" }}>
+                {letters.map(([k, label]) => (pkg[k] ? <button key={k} onClick={() => setLetterTab(k)} style={{ background: "none", border: "none", borderBottom: letterTab === k ? `2px solid ${BLUE}` : "2px solid transparent", padding: "8px 10px", fontSize: 12, fontWeight: letterTab === k ? 700 : 500, color: letterTab === k ? BLUE : "#94a3b8", cursor: "pointer", fontFamily: "inherit" }}>{label}</button> : null))}
+              </div>
+              <pre style={{ whiteSpace: "pre-wrap", fontSize: 12.5, lineHeight: 1.7, fontFamily: "Georgia,serif", color: "#111", background: "#fafafa", border: "1px solid #f1f5f9", borderRadius: 10, padding: 16, maxHeight: 360, overflow: "auto", margin: 0 }}>{pkg[letterTab] || "—"}</pre>
+            </> : <div style={{ fontSize: 13, color: "#94a3b8", padding: "8px 0 16px" }}>No package generated yet for this client.</div>}
+
+            {/* Review controls */}
+            <div style={{ marginTop: 18, borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Review</div>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Private notes" style={{ width: "100%", boxSizing: "border-box", minHeight: 56, padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", marginBottom: 10, resize: "vertical" }} />
+              <textarea value={requests} onChange={e => setRequests(e.target.value)} placeholder="Changes to request from the client" style={{ width: "100%", boxSizing: "border-box", minHeight: 56, padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", marginBottom: 12, resize: "vertical" }} />
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button onClick={() => saveReview("approved")} style={{ padding: "9px 16px", borderRadius: 10, border: "none", background: "#16a34a", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Approve</button>
+                <button onClick={() => saveReview("changes_requested")} style={{ padding: "9px 16px", borderRadius: 10, border: "none", background: "#d97706", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Request changes</button>
+                <button onClick={() => saveReview(null)} style={{ padding: "9px 16px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", color: "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Save notes</button>
+                {saveMsg && <span style={{ fontSize: 12, color: saveMsg.startsWith("Error") ? "#dc2626" : "#16a34a", fontWeight: 600 }}>{saveMsg}</span>}
+              </div>
+            </div>
+          </div>}
+      </div>
+    </div>
+  </div>;
+}
+
+// Route: /admin shows Brandon's dashboard; everything else is the client agent.
+export default function Root() {
+  const path = typeof window !== "undefined" ? window.location.pathname : "/";
+  if (path.replace(/\/$/, "").endsWith("/admin")) return <AdminDashboard />;
+  return <ClientApp />;
 }
