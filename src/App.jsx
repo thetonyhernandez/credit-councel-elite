@@ -287,7 +287,7 @@ You MUST collect all of the following from the client before a package can be fi
 3. Social Security card — clear photo, all four corners visible.
 4. Proof of current address — an electric/utility bill or bank statement within 30 days, date area cropped out; show only name, company, and address.
 5. FTC Identity Theft Report — filed at IdentityTheft.gov; you need the FTC report number AND the saved report. If they have not filed, walk them through it step by step (use the FTC guide), then have them upload the PDF or a photo of it.
-6. Identity Theft Affidavit (Identity Theft Victim's Complaint, H-1 through H-6) — filled out and notarized; have them upload it.
+6. Identity Theft Affidavit — OPTIONAL to upload. If the client already has a notarized affidavit, have them upload it. If they do not, the app fills one out automatically and leaves the notary section blank, so do not block on it — just let them know it will be in their downloaded packet to print and get notarized.
 7. Police report (optional) — strengthens the packet if they have one.
 (The FCRA 605B law page is added to every packet automatically — do NOT ask the client for it.)
 NEVER generate a package while any required document is missing. If something is missing, ask for it — do not skip ahead. Your job is to request and confirm these documents, then build the package.
@@ -908,6 +908,48 @@ export default function App() {
     return doc;
   }
 
+  // Auto-filled Identity Theft Affidavit, used when the client has not uploaded a
+  // notarized one. Fills their details and the fraudulent items; leaves signature and
+  // notary blank so they print it, sign, and have it notarized.
+  function buildAffidavitDoc(bureauKey, JsPDF) {
+    const b = BUREAUS.find(x => x.key === bureauKey);
+    const doc = new JsPDF({ unit: "pt", format: "letter" });
+    const M = 56, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), maxW = W - M * 2;
+    let y = M;
+    const room = (lh) => { if (y + lh > H - M) { doc.addPage(); y = M; } };
+    const line = (txt, opt = {}) => {
+      const { size = 11, bold = false, gap = 16, color = "#111111" } = opt;
+      doc.setFont("times", bold ? "bold" : "normal"); doc.setFontSize(size); doc.setTextColor(color);
+      doc.splitTextToSize(String(txt || ""), maxW).forEach(s => { room(gap); doc.text(s, M, y); y += gap; });
+    };
+    const items = (pkg.disputeItems && pkg.disputeItems[bureauKey]) || [];
+    const accounts = items.filter(s => !/inquiry/i.test(s));
+    const inquiries = items.filter(s => /inquiry/i.test(s));
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor("#0f172a");
+    room(26); doc.text("Identity Theft Victim's Affidavit", M, y); y += 24;
+    line(`Submitted to ${b.label}`, { color: "#64748b", gap: 18 });
+    line(`Affiant: ${pkg.clientName || ""}`);
+    line(`Date of Birth: ${pkg.dob || ""}`);
+    line(`Social Security Number: ${pkg.ssn4 ? "XXX-XX-" + pkg.ssn4 : ""}`);
+    line(`Address: ${pkg.clientAddress || ""}`);
+    y += 8;
+    line("I declare that I am a victim of identity theft. The accounts and inquiries listed below were opened or made without my knowledge, consent, or authorization. I did not authorize, use, benefit from, or receive any goods, services, or money from them, and I believe they are the result of identity theft.");
+    y += 6;
+    if (accounts.length) { line("Fraudulent accounts:", { bold: true, gap: 18 }); accounts.forEach((a, i) => line(`${i + 1}. ${a}`, { gap: 15 })); y += 4; }
+    if (inquiries.length) { line("Unauthorized inquiries:", { bold: true, gap: 18 }); inquiries.forEach((a, i) => line(`${i + 1}. ${a}`, { gap: 15 })); y += 4; }
+    y += 6;
+    line("I declare under penalty of perjury under the laws of the United States that the foregoing is true and correct.");
+    y += 28;
+    line("Signature: ______________________________     Date: ______________", { gap: 26 });
+    y += 16;
+    line("Notary Acknowledgment", { bold: true, gap: 20 });
+    line("State of ____________________   County of ____________________", { gap: 24 });
+    line("Subscribed and sworn to before me this ______ day of ______________, 20____.", { gap: 24 });
+    line("Notary Public: ______________________________", { gap: 24 });
+    line("My commission expires: __________________", { gap: 18 });
+    return doc;
+  }
+
   // Build ONE complete mailable PDF per bureau, in Brandon's exact order:
   // cover letter → personal info → ID/passport/SSN/bill → credit report → FTC report
   // → affidavit → FCRA 605B. Documents come from the slots; chat uploads are the fallback.
@@ -919,17 +961,13 @@ export default function App() {
       setStatusTxt(`Building ${b.label} packet…`);
       const JsPDF = await loadJsPDF();
       const lettersDoc = buildLettersDoc(bureauKey, JsPDF);
-      // Documents to attach: slots in order, else fall back to chat-upload order.
-      const ordered = PACKET_SLOTS.map(s => slots[s.key]).filter(Boolean);
-      const attachments = ordered.length ? ordered : docFiles;
       const PDFLib = await loadPdfLib();
       const merged = await PDFLib.PDFDocument.create();
       const appendDoc = async (jsdoc) => {
         const d = await PDFLib.PDFDocument.load(jsdoc.output("arraybuffer"));
         (await merged.copyPages(d, d.getPageIndices())).forEach(p => merged.addPage(p));
       };
-      await appendDoc(lettersDoc);
-      for (const f of attachments) {
+      const appendFile = async (f) => {
         try {
           const bytes = dataURLtoBytes(f.dataUrl);
           if (f.type === "application/pdf") {
@@ -944,6 +982,19 @@ export default function App() {
             page.drawImage(img, { x: (612 - w) / 2, y: (792 - h) / 2, width: w, height: h });
           }
         } catch (inner) { console.error("Skipped document", f.name, inner.message); }
+      };
+      await appendDoc(lettersDoc);
+      // Attach the documents in packet order. If the affidavit was not uploaded,
+      // generate a filled one (notary section left blank) and drop it in its place.
+      const anySlot = PACKET_SLOTS.some(s => slots[s.key]);
+      if (anySlot) {
+        for (const s of PACKET_SLOTS) {
+          if (slots[s.key]) await appendFile(slots[s.key]);
+          else if (s.key === "affidavit") await appendDoc(buildAffidavitDoc(bureauKey, JsPDF));
+        }
+      } else {
+        for (const f of docFiles) await appendFile(f);
+        await appendDoc(buildAffidavitDoc(bureauKey, JsPDF));
       }
       await appendDoc(build605BDoc(JsPDF)); // standard law page closes the packet
       const out = await merged.save();
