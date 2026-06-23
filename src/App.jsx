@@ -678,6 +678,36 @@ export default function App() {
     try { return JSON.parse(after.slice(start, end + 1)); } catch { return null; }
   }
 
+  // Focused, prose-free generation the user can trigger directly. Asks the model for
+  // ONLY the PACKAGE_READY block from everything already collected, then builds it.
+  async function generatePackages() {
+    if (busy) return;
+    setBusy(true); setStatusTxt("Building your packages…"); setProgress(95);
+    try {
+      const directive = { role: "user", content: "Generate the three dispute packages now. Output ONLY the PACKAGE_READY block — the line PACKAGE_READY: followed by the JSON object — using all client info and documents already collected. No prose, no questions, nothing before or after the block." };
+      const txt = await callAPI([...history, directive], 8000);
+      const { clean, state } = extractState(txt);
+      applyState(state);
+      const json = parsePackage(clean);
+      if (json) {
+        setPkg(json); setProgress(100); setStatusTxt("Package complete");
+        setHistory(prev => [...prev, directive, { role: "assistant", content: clean }]);
+        const cid = clientId || await saveClient(json);
+        if (cid) await savePackage(cid, json);
+        setTab(1);
+      } else {
+        setProgress(80); setStatusTxt("Could not generate");
+        setTab(0);
+        setMessages(prev => [...prev, { from: "agent", text: "I could not assemble the packages yet — I may still be missing a required item (credit report, photo ID, proof of address, or the FTC report number). Add what is missing in Intake, then try again." }]);
+      }
+    } catch (e) {
+      console.error("generatePackages error:", e.message);
+      setStatusTxt("Generation error"); setTab(0);
+      setMessages(prev => [...prev, { from: "agent", text: "Error building packages: " + e.message + ". Please screenshot this." }]);
+    }
+    setBusy(false);
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || busy) return;
@@ -854,8 +884,14 @@ export default function App() {
       document.body.appendChild(s);
     });
   }
-  const loadJsPDF = () => loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => window.jspdf?.jsPDF);
-  const loadPdfLib = () => loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js", () => window.PDFLib);
+  const loadJsPDF = async () => {
+    try { return (await import("jspdf")).jsPDF; }
+    catch { return loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => window.jspdf?.jsPDF); }
+  };
+  const loadPdfLib = async () => {
+    try { return await import("pdf-lib"); }
+    catch { return loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js", () => window.PDFLib); }
+  };
 
   function dataURLtoBytes(dataUrl) {
     const b64 = (dataUrl || "").split(",")[1] || "";
@@ -1016,6 +1052,8 @@ export default function App() {
       setStatusTxt("Packet downloaded");
     } catch (e) {
       console.error("downloadBureauPacket error:", e.message);
+      setStatusTxt("PDF error — opening print view");
+      setMessages(prev => [...prev, { from: "agent", text: `I could not build the ${b.label} PDF automatically (${e.message}). I am opening a print view as a backup — use your browser's "Save as PDF". If this keeps happening, screenshot this message.` }]);
       printBureau(bureauKey); // dependency-free fallback
     }
   }
@@ -1220,8 +1258,11 @@ export default function App() {
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 40, textAlign: "center" }}>
                 <div style={{ width: 64, height: 64, borderRadius: 20, background: "#f8faff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>📬</div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: "#1e293b" }}>No Package Yet</div>
-                <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.65, maxWidth: 260 }}>Complete the intake and your full 3-bureau dispute package will appear here.</div>
-                <button onClick={() => setTab(0)} style={{ marginTop: 4, padding: "11px 28px", background: "#1e3a8a", color: "#fff", border: "none", borderRadius: 24, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Start Intake →</button>
+                <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.65, maxWidth: 260 }}>Complete the intake, then generate your full 3-bureau package here.</div>
+                <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
+                  <button onClick={() => setTab(0)} style={{ padding: "11px 22px", background: "#f8faff", color: "#1e3a8a", border: "1.5px solid #e2e8f0", borderRadius: 24, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Go to Intake</button>
+                  <button onClick={generatePackages} disabled={busy} style={{ padding: "11px 22px", background: busy ? "#94a3b8" : "#1e3a8a", color: "#fff", border: "none", borderRadius: 24, fontSize: 14, fontWeight: 600, cursor: busy ? "not-allowed" : "pointer", fontFamily: "inherit" }}>{busy ? "Generating…" : "Generate packages"}</button>
+                </div>
               </div>
             ) : (
               <>
