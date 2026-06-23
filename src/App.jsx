@@ -403,6 +403,7 @@ export default function App() {
   const [profile,     setProfile]     = useState(null);
   const profileRef                    = useRef(null);
   const [restored,    setRestored]    = useState(false);
+  const [dragActive,  setDragActive]  = useState(false);
 
   // Save client to Supabase
   async function saveClient(data) {
@@ -696,12 +697,12 @@ export default function App() {
     setTimeout(() => inputRef.current?.focus(), 100);
   }
 
-  async function handleFiles(e) {
-    const files = Array.from(e.target.files);
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList || []);
     if (!files.length) return;
 
     setUploads(prev => [...prev, ...files.map(f => ({ name: f.name, size: f.size }))]);
-    setMessages(prev => [...prev, { from: "user", text: `📎 Uploading: ${files.map(f => f.name).join(", ")}` }]);
+    setMessages(prev => [...prev, { from: "user", text: `Uploading: ${files.map(f => f.name).join(", ")}` }]);
     setBusy(true);
     setStatusTxt("Uploading documents...");
 
@@ -1082,12 +1083,19 @@ export default function App() {
 
             {/* Upload */}
             <div style={{ padding: "0 16px 8px", flexShrink: 0 }}>
-              <div className="upload-area" onClick={() => fileRef.current?.click()} style={{ border: "1.5px dashed #e2e8f0", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", background: "#fff", transition: "all .15s" }}>
-                <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={handleFiles} style={{ display: "none" }} />
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#f8faff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📎</div>
+              <div
+                className="upload-area"
+                onClick={() => fileRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); if (!dragActive) setDragActive(true); }}
+                onDragEnter={e => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={e => { e.preventDefault(); if (e.currentTarget === e.target) setDragActive(false); }}
+                onDrop={e => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files); }}
+                style={{ border: `1.5px dashed ${dragActive ? "#1e3a8a" : "#e2e8f0"}`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", background: dragActive ? "#f0f5ff" : "#fff", transition: "all .15s" }}>
+                <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#f8faff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#1e3a8a", flexShrink: 0 }}>+</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>Upload Documents</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>Credit report, ID, SSN card, FTC report — AI extracts automatically</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{dragActive ? "Drop your files here" : "Upload or drag documents here"}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>Credit report, ID, SSN card, FTC report — the agent reads them automatically</div>
                 </div>
                 {uploads.length > 0 && <div style={{ background: "#dcfce7", color: "#16a34a", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, flexShrink: 0 }}>{uploads.length} uploaded</div>}
               </div>
@@ -1139,7 +1147,10 @@ export default function App() {
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Packet Documents</div>
                       <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16, lineHeight: 1.5 }}>These attach to every bureau packet in this exact order. Uploads from the chat are sorted here automatically — tap any row to set or replace a file.</div>
                       {PACKET_SLOTS.map((s, i) => (
-                        <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #f1f5f9" }}>
+                        <div key={s.key}
+                          onDragOver={e => { e.preventDefault(); }}
+                          onDrop={e => { e.preventDefault(); if (e.dataTransfer.files[0]) setSlotFile(s.key, e.dataTransfer.files[0]); }}
+                          style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #f1f5f9" }}>
                           <div style={{ width: 22, height: 22, borderRadius: 6, background: slots[s.key] ? "#0f766e" : "#f1f5f9", color: slots[s.key] ? "#fff" : "#94a3b8", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{slots[s.key] ? "✓" : i + 1}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, color: "#1e293b", fontWeight: 600 }}>{s.label}</div>
