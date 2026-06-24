@@ -146,14 +146,18 @@ THE FTC REPORT:
 The FTC Identity Theft Report is filed by the client themselves at IdentityTheft.gov, and only by clients who are genuinely identity theft victims. You may tell a client where to file it, but you do NOT script statements claiming specific accounts are fraud and you do NOT tell the client what to declare. That is the client's own statement to make.
 
 ═══════════════════════════════════════════
-DOCUMENTS TO COLLECT (one at a time, in order)
+DOCUMENTS TO COLLECT
 ═══════════════════════════════════════════
 1. Credit report (MyFreeScoreNow) — to identify items.
 2. Government photo ID — all four corners, no glare.
 3. Social Security card — all four corners.
 4. Proof of current address — utility bill or bank statement within 30 days, date cropped.
 5. (Optional) Identity Theft Affidavit — only if the client is a genuine victim and completes the app's affidavit step; never required, never blocked on.
-Record each in "documentsReceived" and never ask twice. Ask for the next only after the previous arrives. The FCRA 605B page is added automatically — do not ask for it.
+
+TWO WAYS THE CLIENT CAN UPLOAD — support BOTH:
+- ALL AT ONCE: The client may drop every document and image together in one go. When several arrive in the same turn, read and extract from EVERY one of them that turn, tell the client everything you found across all of them (identity info, negative items, inquiries, personal-info issues), record each in "documentsReceived", and then ask only for whatever is still missing. Do not make them re-send one at a time.
+- ONE AT A TIME: If the client uploads a single document, seems unsure, or asks for help, guide them through the list above in order, one item per turn, explaining each — the step-by-step experience is preserved for anyone who needs it.
+Record each document in "documentsReceived" and never ask twice. Only ask for what is still missing. The FCRA 605B page is added automatically — do not ask for it.
 
 ═══════════════════════════════════════════
 OUTPUT FORMAT
@@ -661,36 +665,53 @@ function ClientApp() {
       return next;
     });
 
-    const blocks = [];
+    // Build readable blocks; any single file too large to read is noted as text.
+    const readable = [];
+    const tooBig = [];
     for (const fd of fileData) {
-      if (fd.size > 3 * 1024 * 1024) {
-        blocks.push({ type: "text", text: `File "${fd.name}" (${Math.round(fd.size/1024/1024)}MB) has been saved to secure storage. It is too large to read automatically — please tell me the key information from this document.` });
-      } else if (fd.type === "application/pdf") {
-        blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: fd.data.split(",")[1] } });
-      } else if (fd.type.startsWith("image/")) {
-        blocks.push({ type: "image", source: { type: "base64", media_type: fd.type, data: fd.data.split(",")[1] } });
-      }
+      if (fd.size > 3 * 1024 * 1024) tooBig.push(fd.name);
+      else if (fd.type === "application/pdf") readable.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: fd.data.split(",")[1] } });
+      else if (fd.type.startsWith("image/")) readable.push({ type: "image", source: { type: "base64", media_type: fd.type, data: fd.data.split(",")[1] } });
     }
-    blocks.push({ type: "text", text: `I uploaded: ${files.map(f => f.name).join(", ")}. Please read carefully, extract all info, tell me what you found, and ask which items I want to dispute or for anything still needed.` });
 
-    let userBlocks = blocks;
-    let newHist = [...history, { role: "user", content: userBlocks }];
-    if (bodySize(newHist) > SAFE_BODY_LIMIT) {
-      newHist = [...lightenAll(history), { role: "user", content: userBlocks }];
+    // Split the readable blocks into chunks that each fit under the request size limit,
+    // so a client can drop everything at once and the agent still reads all of it.
+    const baseHist = lightenAll(history);
+    const chunks = [];
+    let cur = [];
+    for (const blk of readable) {
+      const probe = [...baseHist, { role: "user", content: [...cur, blk, { type: "text", text: "x" }] }];
+      if (cur.length > 0 && bodySize(probe) > SAFE_BODY_LIMIT) { chunks.push(cur); cur = [blk]; }
+      else cur = [...cur, blk];
     }
-    if (bodySize(newHist) > SAFE_BODY_LIMIT) {
-      userBlocks = [{ type: "text", text: `I uploaded ${files.map(f => f.name).join(", ")}, but it is too large for me to read automatically. It is saved securely in storage — I will provide the key details by typing them.` }];
-      newHist = [...lightenAll(history), { role: "user", content: userBlocks }];
-      setMessages(prev => [...prev, { from: "agent", text: "That file is a bit large for automatic reading, but it's saved securely. Upload a smaller PDF or a JPG screenshot of the report, or just type the key details — and we'll keep moving." }]);
-    }
-    setHistory(newHist);
+    if (cur.length) chunks.push(cur);
+    if (chunks.length === 0) chunks.push([]);
+
+    const names = files.map(f => f.name).join(", ");
+    let runningHist = baseHist;
+    let finalClean = "";
     try {
-      const txt = await callAPI(newHist, 8000);
-      const { clean, state } = extractState(txt);
-      applyState(state);
-      const lightHist = [...lightenAll(history), { role: "user", content: lighten(userBlocks) }];
-      const updHist = [...lightHist, { role: "assistant", content: clean }];
-      setHistory(updHist);
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const isLast = ci === chunks.length - 1;
+        const instr = isLast
+          ? `I uploaded: ${names}.${tooBig.length ? ` (Too large to read automatically: ${tooBig.join(", ")} — I will type those details.)` : ""} Please read carefully, extract everything from all of my documents into your memory, tell me what you found, and ask which items I want to dispute or for anything still needed.`
+          : `Here are some of my documents (batch ${ci + 1} of ${chunks.length}). Read them and extract everything into your memory now. More are coming in my next message — just confirm you have read these and do not ask for anything yet.`;
+        let userMsg = { role: "user", content: [...chunks[ci], { type: "text", text: instr }] };
+        let sendHist = [...runningHist, userMsg];
+        if (bodySize(sendHist) > SAFE_BODY_LIMIT) {
+          userMsg = { role: "user", content: [{ type: "text", text: `I uploaded ${names}, but the files are too large to read automatically. They are saved securely in storage — I will type the key details.` }] };
+          sendHist = [...runningHist, userMsg];
+          if (isLast) setMessages(prev => [...prev, { from: "agent", text: "Some files were a bit large for automatic reading, but they're saved securely. You can upload smaller copies or just type the key details and we'll keep moving." }]);
+        }
+        setStatusTxt(chunks.length > 1 ? `Reading documents (${ci + 1}/${chunks.length})…` : "Reading documents...");
+        const txt = await callAPI(sendHist, 8000);
+        const { clean, state } = extractState(txt);
+        applyState(state);
+        finalClean = clean;
+        runningHist = [...runningHist, { role: "user", content: lighten(userMsg.content) }, { role: "assistant", content: clean }];
+      }
+      setHistory(runningHist);
+      const clean = finalClean;
       if (clean.includes("PACKAGE_READY:")) {
         const json = parsePackage(clean);
         if (json) {
@@ -1371,7 +1392,7 @@ function ClientApp() {
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: "#f8faff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#1e3a8a", flexShrink: 0 }}>+</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{dragActive ? "Drop your files here" : "Upload or drag documents here"}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>Credit report, ID, SSN card, proof of address — the agent reads them automatically</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>Drop them all at once or one at a time — credit report, ID, SSN card, proof of address. The agent reads everything automatically.</div>
                 </div>
                 {uploads.length > 0 && <div style={{ background: "#dcfce7", color: "#16a34a", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, flexShrink: 0 }}>{uploads.length} uploaded</div>}
               </div>
