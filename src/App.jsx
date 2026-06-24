@@ -137,10 +137,11 @@ TransUnion: TransUnion Consumer Solutions, P.O. Box 2000, Chester, PA 19016-2000
 
 THE AFFIDAVIT:
 Do NOT fill out the Identity Theft Affidavit and do NOT tell the client what to write on it. The client completes it themselves.
-IN-CHAT IDENTITY-THEFT STEPS: Only when the client affirmatively tells you that one or more SPECIFIC items resulted from identity theft (they state the account or inquiry was opened or made without their authorization), do the following in your reply, and never otherwise:
+ASK AS A STANDARD STEP: After the client confirms the items you extracted, and BEFORE you build the package, you must ask one plain question: "Were any of these items opened or used without your authorization — that is, identity theft? If so, I'll have you complete the FTC affidavit. If not, we'll dispute them as inaccurate." Wait for their answer. Do not build the package in the same turn as this question.
+IN-CHAT IDENTITY-THEFT STEPS: When the client answers that one or more items WERE identity theft, do the following in your next reply:
 - Briefly tell them to file their own report at IdentityTheft.gov, then output the token FTC_REPORT_STEP on its own line. This shows an upload box in the chat for them to attach the report they create.
 - Tell them to complete the official FTC affidavit, then output the token AFFIDAVIT_STEP on its own line. This opens a fill-in form in the chat where THEY type their own answers, which are printed onto the official FTC form for them to sign and notarize.
-Output each token at most once in the whole conversation. Never output either token unless the client has affirmatively said a specific item is identity theft. Never pre-decide which items are fraud, never list items as fraudulent on the client's behalf, and never coach what to claim. If the client only says an item is inaccurate or not theirs (not identity theft), do NOT output the tokens — just dispute it on accuracy grounds under Section 611.
+Output each token at most once in the whole conversation. If the client says none were identity theft (only inaccurate or not theirs), do NOT output the tokens — proceed to build and dispute on accuracy grounds under Section 611. Never pre-decide which items are fraud, never list items as fraudulent on the client's behalf, and never coach what to claim.
 
 THE FTC REPORT:
 The FTC Identity Theft Report is filed by the client themselves at IdentityTheft.gov, and only by clients who are genuinely identity theft victims. You may tell a client where to file it, but you do NOT script statements claiming specific accounts are fraud and you do NOT tell the client what to declare. That is the client's own statement to make.
@@ -784,6 +785,26 @@ function ClientApp() {
     setBusy(false);
   }
 
+  // Drop the affidavit fill-in form into the chat on demand (always reachable).
+  function openAffidavitInChat() {
+    setTab(0);
+    setMessages(prev => [
+      ...prev,
+      { from: "agent", text: "If any items on your report were opened or used by an identity thief, fill out the official FTC affidavit below in your own words. Only complete it if you are genuinely a victim — otherwise you can skip it and we'll dispute on accuracy grounds. You'll sign and notarize it yourself." },
+      { from: "affidavit_form" },
+    ]);
+  }
+
+  // Drop the FTC report upload box into the chat on demand.
+  function openFtcInChat() {
+    setTab(0);
+    setMessages(prev => [
+      ...prev,
+      { from: "agent", text: "If you are an identity theft victim, file your report at IdentityTheft.gov, then upload the PDF here and I'll attach it to your packet." },
+      { from: "ftc_upload" },
+    ]);
+  }
+
   // Client finished the in-chat affidavit form: save their answers and continue.
   function completeAffidavit(ans) {
     setAffidavitData({ ...ans, completed: true });
@@ -1395,6 +1416,14 @@ function ClientApp() {
                   <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>Drop them all at once or one at a time — credit report, ID, SSN card, proof of address. The agent reads everything automatically.</div>
                 </div>
                 {uploads.length > 0 && <div style={{ background: "#dcfce7", color: "#16a34a", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, flexShrink: 0 }}>{uploads.length} uploaded</div>}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <button onClick={openAffidavitInChat} style={{ flex: 1, minWidth: 140, padding: "9px 12px", background: affidavitData?.completed ? "#f0fdf4" : "#faf5ff", border: `1.5px solid ${affidavitData?.completed ? "#bbf7d0" : "#e9d5ff"}`, color: affidavitData?.completed ? "#16a34a" : "#7C3AED", borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  {affidavitData?.completed ? "✓ Affidavit filled — edit" : "Identity theft? Fill the affidavit"}
+                </button>
+                <button onClick={openFtcInChat} style={{ flex: 1, minWidth: 140, padding: "9px 12px", background: slots.ftcReport ? "#f0fdf4" : "#f8faff", border: `1.5px solid ${slots.ftcReport ? "#bbf7d0" : "#e2e8f0"}`, color: slots.ftcReport ? "#16a34a" : "#1e3a8a", borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  {slots.ftcReport ? "✓ FTC report attached" : "Add FTC report"}
+                </button>
               </div>
             </div>
 
