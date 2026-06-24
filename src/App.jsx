@@ -136,7 +136,11 @@ Experian: Experian, P.O. Box 4500, Allen, TX 75013
 TransUnion: TransUnion Consumer Solutions, P.O. Box 2000, Chester, PA 19016-2000
 
 THE AFFIDAVIT:
-Do NOT fill out the Identity Theft Affidavit. If a client states they are a genuine identity theft victim and wants to include one, tell them: "Open the Affidavit tab in the Package section. Download the official FTC Identity Theft Affidavit, fill it out yourself, have it notarized, and upload your completed copy — it will be added to your packet. The blank official form is also included automatically." You provide the official blank form only. You never assert that any item was opened by a thief and you never tell the client what to write on it.
+Do NOT fill out the Identity Theft Affidavit and do NOT tell the client what to write on it. The client completes it themselves.
+IN-CHAT IDENTITY-THEFT STEPS: Only when the client affirmatively tells you that one or more SPECIFIC items resulted from identity theft (they state the account or inquiry was opened or made without their authorization), do the following in your reply, and never otherwise:
+- Briefly tell them to file their own report at IdentityTheft.gov, then output the token FTC_REPORT_STEP on its own line. This shows an upload box in the chat for them to attach the report they create.
+- Tell them to complete the official FTC affidavit, then output the token AFFIDAVIT_STEP on its own line. This opens a fill-in form in the chat where THEY type their own answers, which are printed onto the official FTC form for them to sign and notarize.
+Output each token at most once in the whole conversation. Never output either token unless the client has affirmatively said a specific item is identity theft. Never pre-decide which items are fraud, never list items as fraudulent on the client's behalf, and never coach what to claim. If the client only says an item is inaccurate or not theirs (not identity theft), do NOT output the tokens — just dispute it on accuracy grounds under Section 611.
 
 THE FTC REPORT:
 The FTC Identity Theft Report is filed by the client themselves at IdentityTheft.gov, and only by clients who are genuinely identity theft victims. You may tell a client where to file it, but you do NOT script statements claiming specific accounts are fraud and you do NOT tell the client what to declare. That is the client's own statement to make.
@@ -609,7 +613,7 @@ function ClientApp() {
           setMessages(prev => [...prev, { from: "agent", text: "I have everything I need. Reply \"generate\" and I will build your three packages." }]);
         }
       } else {
-        setMessages(prev => [...prev, { from: "agent", text: clean }]);
+        pushAgentReply(clean);
         if (statusTxt === "Reviewing your documents") setStatusTxt("Intake in progress");
       }
     } catch (e) {
@@ -700,7 +704,7 @@ function ClientApp() {
           setMessages(prev => [...prev, { from: "agent", text: "I have read your documents. Reply \"generate\" and I will build your three packages." }]);
         }
       } else {
-        setMessages(prev => [...prev, { from: "agent", text: clean }]);
+        pushAgentReply(clean);
         setProgress(prev => Math.min(80, prev + 15));
         setStatusTxt("Documents read — continuing intake");
       }
@@ -715,6 +719,74 @@ function ClientApp() {
     }
     setBusy(false);
     inputRef.current?.focus();
+  }
+
+  // Show an agent reply, turning any in-chat step tokens into inline cards:
+  // FTC_REPORT_STEP → an upload box for the client's own FTC report;
+  // AFFIDAVIT_STEP → the fill-in form for the official FTC affidavit.
+  function pushAgentReply(clean) {
+    const wantsFtc = /FTC_REPORT_STEP/.test(clean);
+    const wantsAff = /AFFIDAVIT_STEP/.test(clean);
+    const text = clean.replace(/FTC_REPORT_STEP/g, "").replace(/AFFIDAVIT_STEP/g, "").trim();
+    const add = [];
+    if (text) add.push({ from: "agent", text });
+    if (wantsFtc) add.push({ from: "ftc_upload" });
+    if (wantsAff) add.push({ from: "affidavit_form" });
+    if (add.length) setMessages(prev => [...prev, ...add]);
+  }
+
+  // Send a turn to the agent on the client's behalf (used to continue after a step).
+  async function sendProgrammatic(text) {
+    if (busy || !text) return;
+    setMessages(prev => [...prev, { from: "user", text }]);
+    setBusy(true);
+    const newHist = [...history, { role: "user", content: text }];
+    setHistory(newHist);
+    try {
+      const txt = await callAPI(newHist, 8000);
+      const { clean, state } = extractState(txt);
+      applyState(state);
+      setHistory([...newHist, { role: "assistant", content: clean }]);
+      if (clean.includes("PACKAGE_READY:")) {
+        const json = parsePackage(clean);
+        if (json) {
+          setPkg(json); setProgress(100); setStatusTxt("Package complete");
+          const cid = clientId || await saveClient(json);
+          if (cid) await savePackage(cid, json);
+          setMessages(prev => [...prev, { from: "agent", text: "Your packages are ready. Open the Package tab to review and download each bureau's PDF." }]);
+          setTimeout(() => { setTab(1); setShowReview(true); }, 1400);
+        } else pushAgentReply(clean);
+      } else pushAgentReply(clean);
+    } catch (e) {
+      setMessages(prev => [...prev, { from: "agent", text: "Error: " + e.message }]);
+    }
+    setBusy(false);
+  }
+
+  // Client finished the in-chat affidavit form: save their answers and continue.
+  function completeAffidavit(ans) {
+    setAffidavitData({ ...ans, completed: true });
+    setMessages(prev => {
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        if (copy[i].from === "affidavit_form") { copy[i] = { from: "agent", text: "Saved. Your answers will be printed onto the official FTC affidavit in your packet, ready for you to sign and notarize. You can edit them any time in Package → Affidavit." }; break; }
+      }
+      return copy;
+    });
+    setTimeout(() => sendProgrammatic("I've completed my identity theft affidavit in the app."), 400);
+  }
+
+  function completeFtcUpload(file) {
+    if (!file) return;
+    setSlotFile("ftcReport", file);
+    setMessages(prev => {
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        if (copy[i].from === "ftc_upload") { copy[i] = { from: "agent", text: `Got it — your FTC report (${file.name}) is attached to your packet.` }; break; }
+      }
+      return copy;
+    });
+    setTimeout(() => sendProgrammatic("I've uploaded my FTC identity theft report."), 400);
   }
 
   function copyText(text, key) {
@@ -911,12 +983,20 @@ function ClientApp() {
         [ssn, idDoc, proof].forEach(f => { if (f) used.add(f.dataUrl); });
         return used;
       };
-      // Merge the official blank FTC Identity Theft Affidavit (the client fills it in).
+      // Merge the official FTC affidavit: the client's uploaded completed copy if present,
+      // otherwise the client's in-chat answers printed onto the official form, otherwise blank.
+      const mergePdfBytes = async (bytes) => {
+        const d = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+        (await merged.copyPages(d, d.getPageIndices())).forEach(p => merged.addPage(p));
+      };
       const appendOfficialAffidavit = async () => {
         try {
-          const d = await PDFLib.PDFDocument.load(b64ToBytes(FTC_AFFIDAVIT_B64), { ignoreEncryption: true });
-          (await merged.copyPages(d, d.getPageIndices())).forEach(p => merged.addPage(p));
-        } catch (inner) { console.error("Affidavit merge failed:", inner.message); }
+          if (affidavitData && affidavitData.completed) await mergePdfBytes(await fillAffidavit(affidavitData, PDFLib));
+          else await mergePdfBytes(b64ToBytes(FTC_AFFIDAVIT_B64));
+        } catch (inner) {
+          console.error("Affidavit merge failed:", inner.message);
+          try { await mergePdfBytes(b64ToBytes(FTC_AFFIDAVIT_B64)); } catch {}
+        }
       };
 
       await appendDoc(lettersDoc);
@@ -987,6 +1067,53 @@ function ClientApp() {
     } catch (e) { console.error("downloadBlankAffidavit error:", e.message); }
   }
 
+  // Print the CLIENT'S OWN typed answers onto the official FTC affidavit PDF. The app
+  // sources nothing from the credit report and pre-selects nothing — every value here
+  // was typed or chosen by the client in the in-chat affidavit form. Coordinates were
+  // measured against the official form. Returns filled PDF bytes.
+  async function fillAffidavit(ans, PDFLib) {
+    const doc = await PDFLib.PDFDocument.load(b64ToBytes(FTC_AFFIDAVIT_B64), { ignoreEncryption: true });
+    const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+    const pages = doc.getPages();
+    const H = 792, COL = PDFLib.rgb(0, 0, 0.55);
+    const put = (pi, x, top, text, size = 10) => { if (text == null || text === "") return; pages[pi].drawText(String(text), { x, y: H - top - 7, size, font, color: COL }); };
+    const X = (pi, x0, top) => pages[pi].drawText("X", { x: x0 + 0.5, y: H - top - 7, size: 8, font, color: COL });
+    // Page 1 — About You
+    put(0, 190, 245, ans.fullName);
+    put(0, 182, 271, ans.dob);
+    put(0, 240, 305, ans.ssn);
+    put(0, 192, 326, ans.dlState); put(0, 266, 326, ans.dlNumber);
+    put(0, 98, 381, ans.addr1);
+    put(0, 98, 413, ans.addr2);
+    put(0, 254, 446, ans.since);
+    put(0, 212, 473, ans.dayPhone);
+    put(0, 212, 491, ans.evePhone);
+    put(0, 147, 509, ans.email);
+    put(0, 212, 580, ans.nameThen);
+    put(0, 180, 613, ans.addrThen1);
+    put(0, 98, 647, ans.addrThen2);
+    // Page 2 — Declarations (client's own choices)
+    if (ans.d11) X(1, ans.d11 === "did" ? 117 : 187, 129);
+    if (ans.d12) X(1, ans.d12 === "did" ? 117 : 187, 180);
+    if (ans.d13) X(1, ans.d13 === "am" ? 117 : 187, 220);
+    // Page 3 — fraud account blocks (up to 3), all client-entered
+    const blocks = [
+      { inst: 121, num: 150, t1: 174, t2: 189, so: 228, st: 242, d: 271 },
+      { inst: 322, num: 352, t1: 376, t2: 390, so: 429, st: 443, d: 473 },
+      { inst: 519, num: 549, t1: 573, t2: 588, so: 627, st: 641, d: 670 },
+    ];
+    const typeBox = (B, t) => ({ credit: [133, B.t1], bank: [189, B.t1], phoneutil: [237, B.t1], loan: [332, B.t1], govbenefits: [133, B.t2], internetemail: [261, B.t2], other: [366, B.t2] })[t];
+    (ans.accounts || []).slice(0, 3).forEach((ac, i) => {
+      const B = blocks[i];
+      put(2, 60, B.inst - 12, ac.institution); put(2, 232, B.inst - 12, ac.contact); put(2, 345, B.inst - 12, ac.phone);
+      put(2, 60, B.num - 12, ac.accountNumber); put(2, 250, B.num - 12, ac.routing); put(2, 430, B.num - 12, ac.checkNumbers);
+      const tb = typeBox(B, ac.type); if (tb) X(2, tb[0], tb[1]);
+      if (ac.status === "opened") X(2, 84, B.so); else if (ac.status === "tampered") X(2, 84, B.st);
+      put(2, 60, B.d - 12, ac.dateOpened); put(2, 225, B.d - 12, ac.dateDiscovered); put(2, 430, B.d - 12, ac.amount);
+    });
+    return await doc.save();
+  }
+
   function printAll() {
     if (!pkg) return;
     const w = window.open("", "_blank");
@@ -1012,6 +1139,106 @@ function ClientApp() {
     const r = new FileReader();
     r.onload = ev => setSlots(prev => ({ ...prev, [category]: { name: file.name, type: file.type, dataUrl: ev.target.result } }));
     r.readAsDataURL(file);
+  }
+
+  // Inline card: upload the client's own FTC report (they create it at IdentityTheft.gov).
+  function FtcUploadCard({ onUpload }) {
+    const ref = useRef(null);
+    return (
+      <div style={{ maxWidth: "85%", background: "#fff", border: "1px solid #dbeafe", borderRadius: "4px 16px 16px 16px", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Upload your FTC report</div>
+        <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.6, marginBottom: 12 }}>File your report at IdentityTheft.gov, download the PDF it gives you, then add it here. It will be attached to your packet.</div>
+        <button onClick={() => ref.current?.click()} style={{ padding: "10px 16px", background: "#1e3a8a", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Choose FTC report file</button>
+        <input ref={ref} type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) onUpload(e.target.files[0]); e.target.value = ""; }} />
+      </div>
+    );
+  }
+
+  // Inline card: the client types their OWN answers; nothing is pre-filled from the
+  // credit report. On submit the answers are printed onto the official FTC affidavit.
+  function AffidavitChatForm({ onDone }) {
+    const [f, setF] = useState({
+      fullName: pkg?.clientName || "", dob: pkg?.dob || "", ssn: "", dlState: "", dlNumber: "",
+      addr1: pkg?.clientAddress || "", addr2: "", since: "", dayPhone: "", evePhone: "", email: "",
+      d11: "", d12: "", d13: "",
+    });
+    const [accts, setAccts] = useState([{ institution: "", contact: "", phone: "", accountNumber: "", type: "", status: "", dateOpened: "", dateDiscovered: "", amount: "" }]);
+    const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
+    const setAcct = (i, k, v) => setAccts(prev => prev.map((a, idx) => idx === i ? { ...a, [k]: v } : a));
+    const addAcct = () => setAccts(prev => prev.length >= 3 ? prev : [...prev, { institution: "", contact: "", phone: "", accountNumber: "", type: "", status: "", dateOpened: "", dateDiscovered: "", amount: "" }]);
+    const removeAcct = (i) => setAccts(prev => prev.filter((_, idx) => idx !== i));
+
+    const inp = { width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", marginBottom: 8 };
+    const lab = { fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 3, display: "block" };
+    const seg = (val, opts) => (
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+        {opts.map(([v, label]) => (
+          <button key={v} type="button" onClick={() => val.set(v)} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${val.get === v ? "#1e3a8a" : "#e2e8f0"}`, background: val.get === v ? "#1e3a8a" : "#fff", color: val.get === v ? "#fff" : "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
+        ))}
+      </div>
+    );
+
+    return (
+      <div style={{ maxWidth: "92%", background: "#fff", border: "1px solid #e9d5ff", borderRadius: "4px 16px 16px 16px", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,.05)", maxHeight: 460, overflowY: "auto" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>Identity Theft Affidavit</div>
+        <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.55, marginBottom: 10 }}>Fill this in yourself. Your answers print onto the official FTC form for you to sign and notarize. Only include what you personally know to be true — this is sworn under penalty of perjury.</div>
+
+        <label style={lab}>Full legal name</label><input style={inp} value={f.fullName} onChange={e => set("fullName", e.target.value)} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}><label style={lab}>Date of birth</label><input style={inp} placeholder="mm/dd/yyyy" value={f.dob} onChange={e => set("dob", e.target.value)} /></div>
+          <div style={{ flex: 1 }}><label style={lab}>SSN</label><input style={inp} value={f.ssn} onChange={e => set("ssn", e.target.value)} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}><label style={lab}>Driver's license state</label><input style={inp} value={f.dlState} onChange={e => set("dlState", e.target.value)} /></div>
+          <div style={{ flex: 2 }}><label style={lab}>Driver's license number</label><input style={inp} value={f.dlNumber} onChange={e => set("dlNumber", e.target.value)} /></div>
+        </div>
+        <label style={lab}>Street address</label><input style={inp} value={f.addr1} onChange={e => set("addr1", e.target.value)} />
+        <label style={lab}>City, State, ZIP, Country</label><input style={inp} value={f.addr2} onChange={e => set("addr2", e.target.value)} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}><label style={lab}>Lived here since</label><input style={inp} placeholder="mm/yyyy" value={f.since} onChange={e => set("since", e.target.value)} /></div>
+          <div style={{ flex: 1 }}><label style={lab}>Email</label><input style={inp} value={f.email} onChange={e => set("email", e.target.value)} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}><label style={lab}>Daytime phone</label><input style={inp} value={f.dayPhone} onChange={e => set("dayPhone", e.target.value)} /></div>
+          <div style={{ flex: 1 }}><label style={lab}>Evening phone</label><input style={inp} value={f.evePhone} onChange={e => set("evePhone", e.target.value)} /></div>
+        </div>
+
+        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
+        <label style={lab}>(11) Did you authorize anyone to use your information?</label>
+        {seg({ get: f.d11, set: v => set("d11", v) }, [["did", "I did"], ["didnot", "I did not"]])}
+        <label style={lab}>(12) Did you receive money/goods/services from it?</label>
+        {seg({ get: f.d12, set: v => set("d12", v) }, [["did", "I did"], ["didnot", "I did not"]])}
+        <label style={lab}>(13) Willing to work with law enforcement?</label>
+        {seg({ get: f.d13, set: v => set("d13", v) }, [["am", "I am"], ["amnot", "I am not"]])}
+
+        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>The accounts/inquiries you say are fraud</div>
+        {accts.map((a, i) => (
+          <div key={i} style={{ border: "1px solid #f1f5f9", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED" }}>Item {i + 1}</span>
+              {accts.length > 1 && <button type="button" onClick={() => removeAcct(i)} style={{ background: "none", border: "none", color: "#cbd5e1", fontSize: 14, cursor: "pointer" }}>✕</button>}
+            </div>
+            <input style={inp} placeholder="Company / institution name" value={a.institution} onChange={e => setAcct(i, "institution", e.target.value)} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <input style={{ ...inp, flex: 1 }} placeholder="Account number (if known)" value={a.accountNumber} onChange={e => setAcct(i, "accountNumber", e.target.value)} />
+              <input style={{ ...inp, flex: 1 }} placeholder="Contact / phone" value={a.phone} onChange={e => setAcct(i, "phone", e.target.value)} />
+            </div>
+            {seg({ get: a.type, set: v => setAcct(i, "type", v) }, [["credit", "Credit"], ["bank", "Bank"], ["phoneutil", "Phone/Util"], ["loan", "Loan"], ["other", "Other"]])}
+            {seg({ get: a.status, set: v => setAcct(i, "status", v) }, [["opened", "Opened fraudulently"], ["tampered", "Existing acct tampered"]])}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input style={{ ...inp, flex: 1 }} placeholder="Date opened mm/yyyy" value={a.dateOpened} onChange={e => setAcct(i, "dateOpened", e.target.value)} />
+              <input style={{ ...inp, flex: 1 }} placeholder="Date discovered mm/yyyy" value={a.dateDiscovered} onChange={e => setAcct(i, "dateDiscovered", e.target.value)} />
+            </div>
+            <input style={inp} placeholder="Total amount obtained ($)" value={a.amount} onChange={e => setAcct(i, "amount", e.target.value)} />
+          </div>
+        ))}
+        {accts.length < 3 && <button type="button" onClick={addAcct} style={{ background: "none", border: "1.5px dashed #c4b5fd", color: "#7C3AED", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>+ Add another item</button>}
+
+        <button type="button" onClick={() => onDone({ ...f, accounts: accts })} style={{ width: "100%", height: 44, borderRadius: 12, background: "linear-gradient(135deg,#7C3AED,#a855f7)", border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}>Save my affidavit answers</button>
+        <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginTop: 8, lineHeight: 1.5 }}>You will print, sign, and notarize the form yourself. Signature and notary are left blank.</div>
+      </div>
+    );
   }
 
 
@@ -1098,6 +1325,17 @@ function ClientApp() {
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
               {messages.map((m, i) => (
+                m.from === "ftc_upload" ? (
+                  <div key={i} className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
+                    <FtcUploadCard onUpload={completeFtcUpload} />
+                  </div>
+                ) : m.from === "affidavit_form" ? (
+                  <div key={i} className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
+                    <AffidavitChatForm onDone={completeAffidavit} />
+                  </div>
+                ) : (
                 <div key={i} className="msg" style={m.from === "user" ? { display: "flex", justifyContent: "flex-end" } : { display: "flex", alignItems: "flex-end", gap: 10 }}>
                   {m.from === "agent" && (
                     <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
@@ -1107,6 +1345,7 @@ function ClientApp() {
                     : { maxWidth: "78%", background: "#1e3a8a", borderRadius: "16px 16px 4px 16px", padding: "12px 16px", fontSize: 14, lineHeight: 1.65, color: "#fff", whiteSpace: "pre-wrap" }
                   }>{m.text}</div>
                 </div>
+                )
               ))}
               {busy && (
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
