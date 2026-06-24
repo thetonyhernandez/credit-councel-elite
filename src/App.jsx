@@ -210,6 +210,7 @@ const PACKET_SLOTS = [
   { key: "proofResidence", label: "Proof of Residence (utility / electric bill)" },
   { key: "creditReport",   label: "Credit Report (MyFreeScoreNow)" },
   { key: "affidavit",      label: "Identity Theft Affidavit (only if you are a victim)" },
+  { key: "ftcReport",      label: "FTC Identity Theft Report (you create it at IdentityTheft.gov, then upload it here)" },
   { key: "policeReport",   label: "Police Report (optional)" },
 ];
 
@@ -748,6 +749,7 @@ function ClientApp() {
   function inferSlot(name) {
     const n = (name || "").toLowerCase();
     if (/passport/.test(n)) return "passport";
+    if (/\bftc\b|identitytheft|identity.?theft.?report|ftc.?report/.test(n)) return "ftcReport";
     if (/affidavit|complaint|victim|idtheftaffidavit|\bh-?1\b/.test(n)) return "affidavit";
     if (/police/.test(n)) return "policeReport";
     if (/ssn|social/.test(n)) return "ssnCard";
@@ -805,14 +807,11 @@ function ClientApp() {
     doc.text("Handwrite your cover letter on this page.", M, M);
     doc.setTextColor("#111111");
 
-    // Page 2 — typed cover letter.
+    // Page 2 — the cover letter, rendered as a plain business letter (no branding,
+    // no header) so it matches the reference format exactly.
     doc.addPage(); y = M;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(b.color); doc.text("Credit Counsel Elite", M, y); y += 22;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor("#64748b"); doc.text(`${b.label} Dispute Package — ${pkg.clientName || ""}`, M, y); y += 14;
-    doc.text(new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), M, y); y += 26;
-    heading(`Cover Letter — ${b.label}`, b.color);
-    para(pkg[bureauKey], 11, 16);
-    if (pkg.personalInfoNeeded) { doc.addPage(); y = M; heading("Personal Information Correction Letter", "#374151"); para(buildPersonalInfoText(bureauKey), 11, 16); }
+    para(pkg[bureauKey], 11, 15);
+    if (pkg.personalInfoNeeded) { doc.addPage(); y = M; para(buildPersonalInfoText(bureauKey), 11, 15); }
     return doc;
   }
 
@@ -946,10 +945,15 @@ function ClientApp() {
       await appendDoc(lettersDoc);
       const anySlot = PACKET_SLOTS.some(s => slots[s.key]);
       if (anySlot) {
+        const usedUrls = new Set();
         for (const s of PACKET_SLOTS) {
-          if (slots[s.key]) await appendFile(slots[s.key]);
+          if (slots[s.key]) { await appendFile(slots[s.key]); usedUrls.add(slots[s.key].dataUrl); }
           else if (s.key === "affidavit") await appendDoc(buildAffidavitDoc(bureauKey, JsPDF));
         }
+        // Include every uploaded document that wasn't auto-sorted into a slot
+        // (e.g. an ID, SSN card, or utility bill whose filename didn't match),
+        // so nothing the client uploaded is ever silently dropped.
+        for (const f of docFiles) { if (!usedUrls.has(f.dataUrl)) await appendFile(f); }
       } else {
         for (const f of docFiles) await appendFile(f);
         await appendDoc(buildAffidavitDoc(bureauKey, JsPDF));
