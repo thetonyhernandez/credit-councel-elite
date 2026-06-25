@@ -935,22 +935,27 @@ function ClientApp() {
   function buildLettersDoc(bureauKey, JsPDF) {
     const b = BUREAUS.find(x => x.key === bureauKey);
     const doc = new JsPDF({ unit: "pt", format: "letter" });
-    const M = 56, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), maxW = W - M * 2;
+    const M = 64, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), maxW = W - M * 2;
     let y = M;
-    const room = (lh) => { if (y + lh > H - M) { doc.addPage(); y = M; } };
-    const heading = (txt, color) => { room(30); doc.setFont("times", "bold"); doc.setFontSize(15); doc.setTextColor(color || "#0f172a"); doc.text(txt, M, y); y += 10; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 18; doc.setTextColor("#111111"); };
-    const para = (txt, size = 11, lh = 16) => { doc.setFont("times", "normal"); doc.setFontSize(size); doc.setTextColor("#111111"); doc.splitTextToSize(String(txt || ""), maxW).forEach(line => { room(lh); doc.text(line, M, y); y += lh; }); };
+    const room = (lh) => { if (y + lh > H - M) { doc.addPage(); y = M + 12; } };
+    // Body: 12.5pt serif with generous 18pt leading, blank lines preserved for spacing.
+    const para = (txt, size = 12.5, lh = 18) => {
+      doc.setFont("times", "normal"); doc.setFontSize(size); doc.setTextColor("#111111");
+      String(txt || "").split("\n").forEach(rawLine => {
+        if (rawLine.trim() === "") { room(lh * 0.6); y += lh * 0.6; return; }
+        doc.splitTextToSize(rawLine, maxW).forEach(line => { room(lh); doc.text(line, M, y); y += lh; });
+      });
+    };
 
     // Page 1 — intentionally blank for the client's handwritten cover letter.
     doc.setFont("times", "italic"); doc.setFontSize(9); doc.setTextColor("#cbd5e1");
     doc.text("Handwrite your cover letter on this page.", M, M);
     doc.setTextColor("#111111");
 
-    // Page 2 — the cover letter, rendered as a plain business letter (no branding,
-    // no header) so it matches the reference format exactly.
-    doc.addPage(); y = M;
-    para(pkg[bureauKey], 11, 15);
-    if (pkg.personalInfoNeeded) { doc.addPage(); y = M; para(buildPersonalInfoText(bureauKey), 11, 15); }
+    // Page 2 — the cover letter, rendered as a plain business letter (no branding).
+    doc.addPage(); y = M + 12;
+    para(pkg[bureauKey]);
+    if (pkg.personalInfoNeeded) { doc.addPage(); y = M + 12; para(buildPersonalInfoText(bureauKey)); }
     return doc;
   }
 
