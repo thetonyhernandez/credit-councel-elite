@@ -54,6 +54,9 @@ PERSONAL INFO:
 IMPORTANT — read identity info from documents, never ask the client to type it:
 Read full legal name, current mailing address, date of birth, and SSN directly from the uploaded documents (ID, SSN card, utility bill, credit report). After extracting, show the client what you found and ask only: "Here is what I pulled from your documents — is it all correct?" Never ask the client to type their SSN, DOB, name, or address.
 
+CORRECT NAME — CONFIRM IT:
+The name on the credit report is not always the name the client wants used (for example, after marriage or a name change the report may still show an old last name). Whenever the report's name differs from the ID, OR whenever a personal-information correction is being made, you must ask the client to confirm the exact correct legal name to use going forward — for example: "Your report shows [name on report], but I want to use your correct legal name on everything. What is the exact full name you want used?" Use the name the client gives you on ALL letters and on the affidavit. The personal-information correction letter states only the correct name (the one to update to) — do not write an old-name-to-new-name format, just the correct name. Store the confirmed name as clientName in your state and never revert to the report's version.
+
 DOCUMENT PREP RULES:
 - Photo ID: show the photo and all four corners, legible, no glare/dark spots — bureaus reject cropped corners.
 - Social Security card: show all four corners AND the signature on the front. Both the corners and the signature must be visible.
@@ -161,6 +164,7 @@ TWO WAYS THE CLIENT CAN UPLOAD — support BOTH:
 - ALL AT ONCE: The client may drop every document and image together in one go. When several arrive in the same turn, read and extract from EVERY one of them that turn, tell the client everything you found across all of them (identity info, negative items, inquiries, personal-info issues), record each in "documentsReceived", and then ask only for whatever is still missing. Do not make them re-send one at a time.
 - ONE AT A TIME: If the client uploads a single document, seems unsure, or asks for help, guide them through the list above in order, one item per turn, explaining each — the step-by-step experience is preserved for anyone who needs it.
 Record each document in "documentsReceived" and never ask twice. Only ask for what is still missing. The FCRA 605B page is added automatically — do not ask for it.
+MULTIPLE DOCUMENTS ON ONE FILE: A single uploaded file or image often contains more than one document — for example a photo ID and Social Security card on the same page, or an ID plus a utility bill. Look at the whole image. If you can see the Social Security card, the ID, and/or the proof of address anywhere in an uploaded file, record EACH of them in "documentsReceived" as received. NEVER ask the client to re-upload or "send separately" a document that is already visible in something they uploaded, even if it shares the page with other documents. If a required document is genuinely not visible in anything uploaded, ask only for that one.
 
 ═══════════════════════════════════════════
 OUTPUT FORMAT
@@ -291,6 +295,11 @@ function ClientApp() {
   // Client-completed affidavit (blank until the client fills it in themselves).
   const [affidavitData, setAffidavitData] = useState(null);
   const [showAffidavit, setShowAffidavit] = useState(false);
+  // Track whether the client entered the identity-theft flow (so we don't claim the
+  // packet is "done" while the FTC report / affidavit steps are still open), and make
+  // sure the "ready" message is announced only once.
+  const [idTheftStarted, setIdTheftStarted] = useState(false);
+  const [announcedReady, setAnnouncedReady] = useState(false);
 
   // Text-only Package sub-tabs (these support Copy and render as plain text).
   const TEXT_TABS = ["equifax", "experian", "transunion", "personalInfo", "handwrittenNote"];
@@ -396,6 +405,8 @@ function ClientApp() {
           if (s.approved) setApproved(true);
           if (s.clientId) setClientId(s.clientId);
           if (s.affidavitData) setAffidavitData(s.affidavitData);
+          if (s.idTheftStarted) setIdTheftStarted(true);
+          if (s.announcedReady) setAnnouncedReady(true);
           didRestore = true;
         }
       }
@@ -407,7 +418,7 @@ function ClientApp() {
   // Autosave progress so a client can close the tab and resume where they left off.
   useEffect(() => {
     if (!restored) return;
-    const snap = { v: 2, ts: Date.now(), messages, history, profile: profileRef.current, pkg, slots, docFiles, uploads, progress, statusTxt, approved, clientId, affidavitData };
+    const snap = { v: 2, ts: Date.now(), messages, history, profile: profileRef.current, pkg, slots, docFiles, uploads, progress, statusTxt, approved, clientId, affidavitData, idTheftStarted, announcedReady };
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
     } catch {
@@ -428,6 +439,7 @@ function ClientApp() {
     setUploads([]); setProgress(0); setStatusTxt("Ready to begin"); setApproved(false);
     setClientId(null); setProfile(null); profileRef.current = null; setDocTab("equifax"); setTab(0);
     setAffidavitData(null); setShowAffidavit(false);
+    setIdTheftStarted(false); setAnnouncedReady(false);
     initAgent();
   }
 
@@ -563,11 +575,8 @@ function ClientApp() {
       applyState(state);
       const json = parsePackage(clean);
       if (json) {
-        setPkg(json); setProgress(100); setStatusTxt("Package complete");
         setHistory(prev => [...prev, directive, { role: "assistant", content: clean }]);
-        const cid = clientId || await saveClient(json);
-        if (cid) await savePackage(cid, json);
-        setTab(1);
+        await announcePackage(json, { review: false });
       } else {
         setProgress(80); setStatusTxt("Could not generate");
         setTab(0);
@@ -608,13 +617,7 @@ function ClientApp() {
         setProgress(95); setStatusTxt("Generating package…");
         const json = parsePackage(clean);
         if (json) {
-          setPkg(json);
-          setProgress(100);
-          setStatusTxt("Package complete");
-          const cid = clientId || await saveClient(json);
-          if (cid) await savePackage(cid, json);
-          setMessages(prev => [...prev, { from: "agent", text: `Your three packages are ready, ${json.clientName?.split(" ")[0] || ""}. Open the Package tab to review and download each bureau's PDF. Brandon will review before you print and mail.` }]);
-          setTimeout(() => { setTab(1); setShowReview(true); }, 1800);
+          await announcePackage(json, { review: true });
         } else {
           setProgress(80); setStatusTxt("Ready to generate");
           setMessages(prev => [...prev, { from: "agent", text: "I have everything I need. Reply \"generate\" and I will build your three packages." }]);
@@ -718,11 +721,7 @@ function ClientApp() {
       if (clean.includes("PACKAGE_READY:")) {
         const json = parsePackage(clean);
         if (json) {
-          setPkg(json); setProgress(100); setStatusTxt("Package complete");
-          const cid2 = clientId || await saveClient(json);
-          if (cid2) await savePackage(cid2, json);
-          setMessages(prev => [...prev, { from: "agent", text: `Your three packages are ready. Open the Package tab to review and download each bureau's PDF.` }]);
-          setTimeout(() => { setTab(1); setShowReview(true); }, 1400);
+          await announcePackage(json, { review: true });
         } else {
           setProgress(85); setStatusTxt("Documents read — continuing intake");
           setMessages(prev => [...prev, { from: "agent", text: "I have read your documents. Reply \"generate\" and I will build your three packages." }]);
@@ -745,6 +744,25 @@ function ClientApp() {
     inputRef.current?.focus();
   }
 
+  // Central place to record a generated package and announce it — once, and honestly:
+  // if the client is mid identity-theft flow (FTC report / affidavit not finished), we
+  // say the letters are drafted but NOT "ready to mail".
+  async function announcePackage(json, { review = false } = {}) {
+    setPkg(json); setProgress(100); setStatusTxt("Package complete");
+    const cid = clientId || await saveClient(json);
+    if (cid) await savePackage(cid, json);
+    setTab(1);
+    if (review) setTimeout(() => setShowReview(true), 1400);
+    if (announcedReady) return;
+    setAnnouncedReady(true);
+    const first = json.clientName ? json.clientName.split(" ")[0] : "";
+    const pending = idTheftStarted && !(affidavitData?.completed && slots.ftcReport);
+    const msg = pending
+      ? `Your dispute letters are drafted and in the Package tab${first ? ", " + first : ""}. This isn't ready to mail yet — please finish the identity-theft steps above: upload your FTC report and complete the affidavit. Once both are in, your packets are complete.`
+      : `Your three packages are ready${first ? ", " + first : ""}. Open the Package tab to review and download each bureau's PDF. Brandon will review before you print and mail.`;
+    setMessages(prev => [...prev, { from: "agent", text: msg }]);
+  }
+
   // Show an agent reply, turning any in-chat step tokens into inline cards:
   // FTC_REPORT_STEP → an upload box for the client's own FTC report;
   // AFFIDAVIT_STEP → the fill-in form for the official FTC affidavit.
@@ -756,6 +774,7 @@ function ClientApp() {
     if (text) add.push({ from: "agent", text });
     if (wantsFtc) add.push({ from: "ftc_upload" });
     if (wantsAff) add.push({ from: "affidavit_form" });
+    if (wantsFtc || wantsAff) setIdTheftStarted(true);
     if (add.length) setMessages(prev => [...prev, ...add]);
   }
 
@@ -773,13 +792,8 @@ function ClientApp() {
       setHistory([...newHist, { role: "assistant", content: clean }]);
       if (clean.includes("PACKAGE_READY:")) {
         const json = parsePackage(clean);
-        if (json) {
-          setPkg(json); setProgress(100); setStatusTxt("Package complete");
-          const cid = clientId || await saveClient(json);
-          if (cid) await savePackage(cid, json);
-          setMessages(prev => [...prev, { from: "agent", text: "Your packages are ready. Open the Package tab to review and download each bureau's PDF." }]);
-          setTimeout(() => { setTab(1); setShowReview(true); }, 1400);
-        } else pushAgentReply(clean);
+        if (json) await announcePackage(json, { review: true });
+        else pushAgentReply(clean);
       } else pushAgentReply(clean);
     } catch (e) {
       setMessages(prev => [...prev, { from: "agent", text: "Error: " + e.message }]);
@@ -902,6 +916,42 @@ function ClientApp() {
   // Per-bureau personal information correction letter, built deterministically in code
   // from the template — correct bureau name/address every time, no model placeholders,
   // and the SSN is masked to last-4 (full SSN is never written into the letter or DB).
+  // The Section 611 cover letter, built deterministically in code so the bureau's
+  // name/address is always correct and distinct, and the client's confirmed legal name
+  // is always used. Only the disputed-item list varies per bureau (from the client's
+  // selection). The model no longer controls the address or name.
+  function buildCoverLetterText(bureauKey) {
+    const today = new Date().toLocaleDateString("en-US");
+    const ssn = pkg && pkg.ssn4 ? pkg.ssn4 : "";
+    const addr = (BUREAU_ADDR[bureauKey] || "").replace(/,\s*(P\.?\s*O\.?\s*Box)/i, ",\n$1");
+    const items = (pkg && pkg.disputeItems && pkg.disputeItems[bureauKey]) || [];
+    const lines = [
+      `${(pkg && pkg.clientName) || ""}`,
+      `${(pkg && pkg.clientAddress) || ""}`,
+      ``,
+      addr,
+      ``,
+      `Date: ${today}`,
+      ``,
+      `RE: Request for Reinvestigation of Inaccurate Information; SSN ending ${ssn}`,
+      ``,
+      `To Whom It May Concern,`,
+      ``,
+      `I have reviewed my credit report and am disputing the following items, which I have identified as inaccurate, incomplete, or not belonging to me. Under the Fair Credit Reporting Act Section 611 (15 U.S.C. 1681i), I request that you reinvestigate each item with the furnisher and correct or delete any that cannot be verified as accurate.`,
+      ``,
+      `Items disputed:`,
+    ];
+    if (items.length) items.forEach((it, i) => lines.push(`${i + 1}. ${it}`));
+    else lines.push(`(see the enclosed credit report)`);
+    lines.push(``);
+    lines.push(`For each item above, please confirm its accuracy directly with the furnisher. If an item cannot be verified, please delete it and provide me with an updated copy of my credit report. Please complete this reinvestigation within 30 days as required by Section 611.`);
+    lines.push(``);
+    lines.push(`My contact information is as follows:`);
+    lines.push(`${(pkg && pkg.clientName) || ""}`);
+    lines.push(`${(pkg && pkg.clientAddress) || ""}`);
+    return lines.join("\n");
+  }
+
   function buildPersonalInfoText(bureauKey) {
     const b = BUREAUS.find(x => x.key === bureauKey);
     const today = new Date().toLocaleDateString("en-US");
@@ -955,7 +1005,7 @@ function ClientApp() {
 
     // Page 2 — the cover letter, rendered as a plain business letter (no branding).
     doc.addPage(); y = M + 12;
-    para(pkg[bureauKey]);
+    para(buildCoverLetterText(bureauKey));
     if (pkg.personalInfoNeeded) { doc.addPage(); y = M + 12; para(buildPersonalInfoText(bureauKey)); }
     return doc;
   }
@@ -1292,7 +1342,12 @@ function ClientApp() {
 
 
   const personalInfoPreview = pkg && pkg.personalInfoNeeded ? buildPersonalInfoText("equifax") : "";
-  const copyTextForTab = (key) => key === "personalInfo" ? personalInfoPreview : (pkg?.[key] || "");
+  const copyTextForTab = (key) => {
+    if (key === "personalInfo") return personalInfoPreview;
+    if (key === "handwrittenNote") return BUREAUS.map(b => `— ${b.label} —\n${buildCoverLetterText(b.key)}`).join("\n\n\n");
+    if (BUREAUS.some(b => b.key === key)) return buildCoverLetterText(key);
+    return pkg?.[key] || "";
+  };
 
   return (
     <div style={{ fontFamily: "'Inter', 'SF Pro Display', -apple-system, sans-serif", height: "100vh", display: "flex", flexDirection: "column", background: "#FAFAF9", color: "#0f172a", overflow: "hidden" }}>
@@ -1466,6 +1521,10 @@ function ClientApp() {
               </div>
             ) : (
               <>
+                <div style={{ background: "linear-gradient(135deg,#0f766e,#0d9488)", color: "#fff", padding: "12px 16px", flexShrink: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Your dispute packages are here</div>
+                  <div style={{ fontSize: 11.5, color: "#d1fae5", lineHeight: 1.5, marginTop: 2 }}>Tap "Download all 3 bureau packets" below to save the PDFs, then print and mail one to each bureau. The tabs let you preview each bureau's letter, the personal-info letter, and your documents.</div>
+                </div>
                 <div style={{ display: "flex", borderBottom: "1px solid #f1f5f9", padding: "0 16px", overflowX: "auto", scrollbarWidth: "none", flexShrink: 0 }}>
                   {docTabs.map(t => (
                     <button key={t.key} onClick={() => setDocTab(t.key)} className="tab-btn" style={{ background: "none", border: "none", borderBottom: docTab === t.key ? `2px solid ${t.color}` : "2px solid transparent", padding: "12px 12px 10px", fontSize: 12, fontWeight: docTab === t.key ? 700 : 500, color: docTab === t.key ? t.color : "#94a3b8", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
@@ -1558,25 +1617,37 @@ function ClientApp() {
                     </div>
                   ) : docTab === "handwrittenNote" ? (
                     <div style={{ padding: "20px 18px" }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Your Handwritten Cover Letter</div>
-                      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14, lineHeight: 1.6 }}>Copy this letter word for word on plain white paper using blue or black pen. Handwriting it shows the bureau this is a personal request, not a printed template.</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Your Handwritten Cover Letters</div>
+                      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14, lineHeight: 1.6 }}>Write a separate letter by hand for each bureau, word for word, on plain white paper in blue or black pen. Each bureau's letter has its own address and items — they are not the same.</div>
                       <div style={{ background: "#fdf4ff", border: "1px solid #e9d5ff", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>Important Instructions</div>
-                        <div style={{ fontSize: 12, color: "#6b21a8", lineHeight: 1.65 }}>{pkg?.handwrittenNote || "Write this letter by hand. Do not type or print it. Use plain white paper and blue or black ink."}</div>
+                        <div style={{ fontSize: 12, color: "#6b21a8", lineHeight: 1.65 }}>{pkg?.handwrittenNote || "Write these letters by hand. Do not type or print them. Use plain white paper and blue or black ink."}</div>
                       </div>
-                      <pre style={{ fontSize: 12, lineHeight: 2, color: "#374151", whiteSpace: "pre-wrap", fontFamily: "Georgia, serif", margin: 0, background: "#fffbeb", padding: 16, borderRadius: 10, border: "1px solid #fde68a" }}>{pkg?.equifax || ""}</pre>
-                      <div style={{ marginTop: 12, fontSize: 12, color: "#94a3b8", fontStyle: "italic" }}>Note: Write a separate letter for each bureau. The items differ per bureau based on what appears there.</div>
+                      {BUREAUS.map(b => (
+                        <div key={b.key} style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: b.color, marginBottom: 6 }}>{b.label}</div>
+                          <pre style={{ fontSize: 12, lineHeight: 2, color: "#374151", whiteSpace: "pre-wrap", fontFamily: "Georgia, serif", margin: 0, background: "#fffbeb", padding: 16, borderRadius: 10, border: "1px solid #fde68a" }}>{buildCoverLetterText(b.key)}</pre>
+                        </div>
+                      ))}
                     </div>
                   ) : docTab === "personalInfo" ? (
                     <div style={{ padding: "20px 18px" }}>
                       {pkg?.personalInfoNeeded ? (
-                        <pre style={{ fontSize: 12, lineHeight: 1.95, color: "#374151", whiteSpace: "pre-wrap", fontFamily: "Georgia,serif", margin: 0 }}>{personalInfoPreview}</pre>
+                        <>
+                          <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12, lineHeight: 1.6 }}>One per bureau — each uses that bureau's name and address. All three are in the downloaded packets.</div>
+                          {BUREAUS.map(b => (
+                            <div key={b.key} style={{ marginBottom: 16 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: b.color, marginBottom: 6 }}>{b.label}</div>
+                              <pre style={{ fontSize: 12, lineHeight: 1.95, color: "#374151", whiteSpace: "pre-wrap", fontFamily: "Georgia,serif", margin: 0 }}>{buildPersonalInfoText(b.key)}</pre>
+                            </div>
+                          ))}
+                        </>
                       ) : (
-                        <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>No personal information correction letter is needed — your personal info on the report is already correct. (This preview shows the Equifax version; each bureau's packet uses its own name and address.)</div>
+                        <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>No personal information correction letter is needed — your personal info on the report is already correct.</div>
                       )}
                     </div>
                   ) : (
-                    <pre style={{ fontSize: 12, lineHeight: 1.95, color: "#374151", whiteSpace: "pre-wrap", fontFamily: "Georgia,serif", padding: "20px 18px", margin: 0 }}>{pkg[docTab] || ""}</pre>
+                    <pre style={{ fontSize: 12, lineHeight: 1.95, color: "#374151", whiteSpace: "pre-wrap", fontFamily: "Georgia,serif", padding: "20px 18px", margin: 0 }}>{BUREAUS.some(b => b.key === docTab) ? buildCoverLetterText(docTab) : (pkg[docTab] || "")}</pre>
                   )}
                 </div>
 
@@ -1587,11 +1658,13 @@ function ClientApp() {
                         {copied === docTab ? "✓ Copied" : "Copy"}
                       </button>
                     )}
-                    <button
-                      onClick={() => (BUREAUS.some(b => b.key === docTab) ? downloadBureauPacket(docTab) : downloadAllPackets())}
-                      className="action-btn"
-                      style={{ flex: 2, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#0f766e", border: "none", color: "#fff" }}>
-                      ⬇ {BUREAUS.some(b => b.key === docTab) ? `Download ${BUREAUS.find(b => b.key === docTab)?.label} packet PDF` : "Download all 3 bureau packets"}
+                    {BUREAUS.some(b => b.key === docTab) && (
+                      <button onClick={() => downloadBureauPacket(docTab)} className="action-btn" style={{ flex: 1, height: 42, borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#fff", border: `1.5px solid ${BUREAUS.find(b => b.key === docTab)?.color}`, color: BUREAUS.find(b => b.key === docTab)?.color }}>
+                        ⬇ {BUREAUS.find(b => b.key === docTab)?.label} only
+                      </button>
+                    )}
+                    <button onClick={downloadAllPackets} className="action-btn" style={{ flex: 2, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#0f766e", border: "none", color: "#fff" }}>
+                      ⬇ Download all 3 bureau packets
                     </button>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
