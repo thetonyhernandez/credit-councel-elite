@@ -1166,6 +1166,20 @@ function ClientApp() {
     } catch (e) { console.error("downloadBlankAffidavit error:", e.message); }
   }
 
+  // Download the client's IN-CHAT answers printed onto the official FTC affidavit,
+  // so they can see and verify the filled version that goes into the packet.
+  async function downloadFilledAffidavit() {
+    if (!affidavitData || !affidavitData.completed) return;
+    try {
+      const PDFLib = await loadPdfLib();
+      const bytes = await fillAffidavit(affidavitData, PDFLib);
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = "FTC_Identity_Theft_Affidavit_Filled.pdf"; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { console.error("downloadFilledAffidavit error:", e.message); }
+  }
+
   // Print the CLIENT'S OWN typed answers onto the official FTC affidavit PDF. The app
   // sources nothing from the credit report and pre-selects nothing — every value here
   // was typed or chosen by the client in the in-chat affidavit form. Coordinates were
@@ -1562,24 +1576,39 @@ function ClientApp() {
                       </div>
                     </div>
                   ) : docTab === "affidavit" ? (
+                    (() => {
+                      const filled = affidavitData?.completed;
+                      const uploaded = !!slots.affidavit;
+                      const included = filled || uploaded;
+                      return (
                     <div style={{ padding: "20px 18px" }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Identity Theft Affidavit (official FTC form)</div>
-                      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14, lineHeight: 1.6 }}>This is the official FTC Identity Theft Victim's Complaint and Affidavit. It is optional and only for genuine identity theft victims. Download it, fill it out yourself, and have it notarized. The app does not fill it in for you. The blank form is included in every packet automatically; if you upload your completed copy, that is used instead.</div>
-                      <div style={{ background: slots.affidavit ? "#f0fdf4" : "#f8faff", border: `1px solid ${slots.affidavit ? "#bbf7d0" : "#e2e8f0"}`, borderRadius: 10, padding: "14px 16px" }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: slots.affidavit ? "#16a34a" : "#64748b", marginBottom: 8 }}>
-                          {slots.affidavit ? `Your completed affidavit is attached: ${slots.affidavit.name}` : "Blank official form will be included"}
+                      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14, lineHeight: 1.6 }}>This is the official FTC Identity Theft Victim's Complaint and Affidavit. It is optional and only for genuine identity theft victims. You fill it out yourself in the chat, then print and notarize it. If you upload a completed copy, that is used instead.</div>
+                      <div style={{ background: included ? "#f0fdf4" : "#f8faff", border: `1px solid ${included ? "#bbf7d0" : "#e2e8f0"}`, borderRadius: 10, padding: "14px 16px" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: included ? "#16a34a" : "#64748b", marginBottom: 8 }}>
+                          {uploaded ? `Your uploaded copy is attached: ${slots.affidavit.name}` : filled ? "✓ Your filled affidavit is completed and included in your packets" : "Blank official form will be included until you fill it out"}
                         </div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button onClick={downloadBlankAffidavit} style={{ padding: "10px 16px", background: "#7C3AED", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                            Download blank FTC affidavit
+                          {filled && !uploaded && (
+                            <button onClick={downloadFilledAffidavit} style={{ padding: "10px 16px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                              ⬇ Download my filled affidavit
+                            </button>
+                          )}
+                          <button onClick={openAffidavitInChat} style={{ padding: "10px 16px", background: "#7C3AED", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            {filled ? "Edit my answers" : "Fill it out in chat"}
+                          </button>
+                          <button onClick={downloadBlankAffidavit} style={{ padding: "10px 16px", background: "#fff", color: "#7C3AED", border: "1.5px solid #e9d5ff", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            Download blank form
                           </button>
                           <label style={{ padding: "10px 16px", background: "#fff", color: "#7C3AED", border: "1.5px solid #e9d5ff", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                            {slots.affidavit ? "Replace completed copy" : "Upload completed copy"}
+                            {uploaded ? "Replace completed copy" : "Upload completed copy"}
                             <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => { setSlotFile("affidavit", e.target.files[0]); e.target.value = ""; }} />
                           </label>
                         </div>
                       </div>
                     </div>
+                      );
+                    })()
                   ) : docTab === "checklist" ? (
                     <div style={{ padding: "20px 18px" }}>
                       {pkg?.packetOrder && (
@@ -1834,7 +1863,7 @@ function ClientApp() {
                 {[
                   { done: uploads.length > 0, icon: "📎", label: "Upload your documents",      sub: "Credit report, ID, SSN card, utility bill",   action: () => { setTab(0); setTimeout(() => fileRef.current?.click(), 300); }, btn: "Upload" },
                   { done: ready,              icon: "📋", label: "Package generated",           sub: "AI built your 3-bureau letters",              action: () => setTab(1), btn: "Review" },
-                  { done: !!slots.affidavit, icon: "📝", label: "Affidavit (only if a victim)", sub: "Official FTC form — fill it out yourself", action: () => { setTab(1); setDocTab("affidavit"); }, btn: ready ? "Open" : null },
+                  { done: !!(slots.affidavit || affidavitData?.completed), icon: "📝", label: "Affidavit (only if a victim)", sub: "Official FTC form — fill it out yourself", action: () => { setTab(1); setDocTab("affidavit"); }, btn: ready ? "Open" : null },
                   { done: approved,           icon: "⚡", label: "Brandon reviews your case",   sub: "Usually within 24 hours",                     action: null, btn: null },
                   { done: false,              icon: "📬", label: "Print & mail your letters",   sub: "Send via USPS Certified Mail",                action: () => setTab(1), btn: approved ? "Print" : null },
                 ].map((s, i) => (
