@@ -19,6 +19,10 @@ try {
 const SAFE_BODY_LIMIT = 4000000;
 // Key for saving a client's in-progress session on their device so they can resume.
 const SESSION_KEY = "cce_session_v2";
+// In-progress affidavit answers live in their own small key. Keeping them out of the main
+// snapshot means a draft can be written on a fast debounce without re-serialising the
+// uploaded documents, and a quota failure on one can never take the other down.
+const AFFIDAVIT_DRAFT_KEY = "cce_affidavit_draft_v1";
 
 const SYSTEM = `You are the official AI intake agent for Credit Counsel Elite, a premium credit repair service operated by Brandon. You are as knowledgeable as Brandon himself — warm, authoritative, precise, and genuinely invested in every client's success. You guide clients through the process from intake to generating their dispute packages.
 
@@ -286,6 +290,272 @@ const AFFIDAVIT_DECLARATIONS = [
   "I am willing to work with law enforcement if charges are brought against the person(s) who committed the fraud.",
 ];
 
+// Inline card: upload the client's own FTC report (they create it at IdentityTheft.gov).
+function FtcUploadCard({ onUpload }) {
+  const ref = useRef(null);
+  return (
+    <div style={{ maxWidth: "85%", background: "#fff", border: "1px solid #dbeafe", borderRadius: "4px 16px 16px 16px", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Upload your FTC report</div>
+      <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.6, marginBottom: 12 }}>File your report at IdentityTheft.gov, download the PDF it gives you, then add it here. It will be attached to your packet.</div>
+      <button onClick={() => ref.current?.click()} style={{ padding: "10px 16px", background: "#1e3a8a", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Choose FTC report file</button>
+      <input ref={ref} type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) onUpload(e.target.files[0]); e.target.value = ""; }} />
+    </div>
+  );
+}
+
+// The client types their OWN answers here; nothing is sourced from the parsed credit
+// report. These two components MUST stay at module scope. Declared inside ClientApp they
+// got a new function identity on every parent render, so React unmounted and remounted
+// them and wiped everything the client had typed.
+const BLANK_ACCT = { institution: "", contact: "", phone: "", extension: "", accountNumber: "", routing: "", checkNumbers: "", type: "", status: "", dateOpened: "", dateDiscovered: "", amount: "" };
+
+function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, onDraft }) {
+  // Seed order: an in-progress draft always wins (it is the newest thing the client
+  // typed), then previously saved answers when they reopen the form to edit, then the
+  // name/address already on file. The draft is what makes an accidental remount or a
+  // page refresh non-destructive — nothing typed here is ever thrown away.
+  const buildSeed = () => {
+    const parsed = splitAddress(seedAddress || "");
+    const base = {
+      fullName: seedName || "", dob: seedDob || "", ssn: "", dlState: "", dlNumber: "",
+      addr1: parsed.street, apt: "", city: parsed.city, state: parsed.state, zip: parsed.zip, country: "",
+      since: "", dayArea: "", dayPhone: "", eveArea: "", evePhone: "", email: "",
+      changed: "", atFraudName: "", atFraudAddr1: "", atFraudApt: "", atFraudCity: "", atFraudState: "",
+      atFraudZip: "", atFraudCountry: "", atFraudDayArea: "", atFraudDayPhone: "", atFraudEveArea: "",
+      atFraudEvePhone: "", atFraudEmail: "",
+      d11: "", d12: "", d13: "",
+      knowsPerson: "", person: "", personAddr1: "", personApt: "", personCity: "", personState: "",
+      personZip: "", personCountry: "", personArea1: "", personPhone1: "", personArea2: "", personPhone2: "", personInfo: "",
+      crimeInfo: "", doc16ID: false, doc16Proof: false,
+      info17A: "", info17B: "", info17C: "",
+      company18A: "", company18B: "", company18C: "",
+      law20: "", ftcNumber: "",
+    };
+    const src = initial && typeof initial === "object" ? initial : null;
+    if (!src) return { fields: base, accounts: [{ ...BLANK_ACCT }] };
+    const fields = { ...base };
+    Object.keys(base).forEach(k => { if (src[k] !== undefined && src[k] !== null) fields[k] = src[k]; });
+    // An older saved session stored one combined address line; split it on the way back in.
+    if (!fields.city && !fields.state && !fields.zip && src.addr2) {
+      const p = splitAddress(src.addr2);
+      fields.city = p.city || src.addr2; fields.state = p.state; fields.zip = p.zip;
+    }
+    // Re-open the optional sections when the saved answers actually contain something,
+    // so an edit never silently hides work the client already did.
+    if (!fields.changed && Object.keys(src).some(k => k.startsWith("atFraud") && src[k])) fields.changed = "yes";
+    if (!fields.knowsPerson && (src.person || src.personAddr1 || src.personInfo)) fields.knowsPerson = "yes";
+    const accounts = Array.isArray(src.accounts) && src.accounts.length
+      ? src.accounts.map(a => ({ ...BLANK_ACCT, ...a }))
+      : [{ ...BLANK_ACCT }];
+    return { fields, accounts };
+  };
+
+  const [f, setF] = useState(() => buildSeed().fields);
+  const [accts, setAccts] = useState(() => buildSeed().accounts);
+  const [saved, setSaved] = useState(false);
+
+  // Report every keystroke up to the parent, which holds it in a ref and writes it to
+  // storage on a debounce. This deliberately does NOT set parent state — re-rendering
+  // the whole chat on each character would make a long conversation crawl.
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    setSaved(false);
+    if (onDraft) onDraft({ ...f, accounts: accts });
+  }, [f, accts]);
+
+  const blankAcct = BLANK_ACCT;
+  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
+  const setAcct = (i, k, v) => setAccts(prev => prev.map((a, idx) => idx === i ? { ...a, [k]: v } : a));
+  const addAcct = () => setAccts(prev => prev.length >= 3 ? prev : [...prev, { ...blankAcct }]);
+  const removeAcct = (i) => setAccts(prev => prev.filter((_, idx) => idx !== i));
+
+    const inp = { width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", marginBottom: 8 };
+    const lab = { fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 3, display: "block" };
+    const seg = (val, opts) => (
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+        {opts.map(([v, label]) => (
+          <button key={v} type="button" onClick={() => val.set(v)} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${val.get === v ? "#1e3a8a" : "#e2e8f0"}`, background: val.get === v ? "#1e3a8a" : "#fff", color: val.get === v ? "#fff" : "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
+        ))}
+      </div>
+    );
+
+    return (
+      <div style={{ maxWidth: "92%", background: "#fff", border: "1px solid #e9d5ff", borderRadius: "4px 16px 16px 16px", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,.05)", maxHeight: 460, overflowY: "auto" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>Identity Theft Affidavit</div>
+        <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.55, marginBottom: 10 }}>Fill this in yourself. Your answers print onto the official FTC form for you to sign and notarize. Only include what you personally know to be true — this is sworn under penalty of perjury.</div>
+
+        <label style={lab}>Full legal name</label><input style={inp} value={f.fullName} onChange={e => set("fullName", e.target.value)} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}><label style={lab}>Date of birth</label><input style={inp} placeholder="mm/dd/yyyy" value={f.dob} onChange={e => set("dob", e.target.value)} /></div>
+          <div style={{ flex: 1 }}><label style={lab}>SSN</label><input style={inp} value={f.ssn} onChange={e => set("ssn", e.target.value)} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}><label style={lab}>Driver's license state</label><input style={inp} value={f.dlState} onChange={e => set("dlState", e.target.value)} /></div>
+          <div style={{ flex: 2 }}><label style={lab}>Driver's license number</label><input style={inp} value={f.dlNumber} onChange={e => set("dlNumber", e.target.value)} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 3 }}><label style={lab}>Number & street name</label><input style={inp} value={f.addr1} onChange={e => set("addr1", e.target.value)} /></div>
+          <div style={{ flex: 1 }}><label style={lab}>Apt / suite</label><input style={inp} value={f.apt} onChange={e => set("apt", e.target.value)} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 2 }}><label style={lab}>City</label><input style={inp} value={f.city} onChange={e => set("city", e.target.value)} /></div>
+          <div style={{ flex: 1 }}><label style={lab}>State</label><input style={inp} value={f.state} onChange={e => set("state", e.target.value)} /></div>
+          <div style={{ flex: 1 }}><label style={lab}>ZIP</label><input style={inp} value={f.zip} onChange={e => set("zip", e.target.value)} /></div>
+          <div style={{ flex: 1 }}><label style={lab}>Country</label><input style={inp} value={f.country} onChange={e => set("country", e.target.value)} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}><label style={lab}>Lived here since</label><input style={inp} placeholder="mm/yyyy" value={f.since} onChange={e => set("since", e.target.value)} /></div>
+          <div style={{ flex: 1 }}><label style={lab}>Email</label><input style={inp} value={f.email} onChange={e => set("email", e.target.value)} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} placeholder="619" value={f.dayArea} onChange={e => set("dayArea", e.target.value)} /></div>
+          <div style={{ flex: 2 }}><label style={lab}>Daytime phone</label><input style={inp} value={f.dayPhone} onChange={e => set("dayPhone", e.target.value)} /></div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} placeholder="619" value={f.eveArea} onChange={e => set("eveArea", e.target.value)} /></div>
+          <div style={{ flex: 2 }}><label style={lab}>Evening phone</label><input style={inp} value={f.evePhone} onChange={e => set("evePhone", e.target.value)} /></div>
+        </div>
+
+        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 6 }}>(8)–(10) At the time of the fraud</div>
+        <label style={lab}>Has your name, address, or phone changed since the fraud happened?</label>
+        {seg({ get: f.changed, set: v => set("changed", v) }, [["yes", "Yes, it changed"], ["no", "No, same as above"]])}
+        {f.changed === "yes" && (
+          <div style={{ border: "1px solid #f1f5f9", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+            <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Enter what your information was back then. Leave anything that didn't change blank.</div>
+            <label style={lab}>Full legal name at the time</label><input style={inp} value={f.atFraudName} onChange={e => set("atFraudName", e.target.value)} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 3 }}><label style={lab}>Number & street name</label><input style={inp} value={f.atFraudAddr1} onChange={e => set("atFraudAddr1", e.target.value)} /></div>
+              <div style={{ flex: 1 }}><label style={lab}>Apt / suite</label><input style={inp} value={f.atFraudApt} onChange={e => set("atFraudApt", e.target.value)} /></div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 2 }}><label style={lab}>City</label><input style={inp} value={f.atFraudCity} onChange={e => set("atFraudCity", e.target.value)} /></div>
+              <div style={{ flex: 1 }}><label style={lab}>State</label><input style={inp} value={f.atFraudState} onChange={e => set("atFraudState", e.target.value)} /></div>
+              <div style={{ flex: 1 }}><label style={lab}>ZIP</label><input style={inp} value={f.atFraudZip} onChange={e => set("atFraudZip", e.target.value)} /></div>
+              <div style={{ flex: 1 }}><label style={lab}>Country</label><input style={inp} value={f.atFraudCountry} onChange={e => set("atFraudCountry", e.target.value)} /></div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} value={f.atFraudDayArea} onChange={e => set("atFraudDayArea", e.target.value)} /></div>
+              <div style={{ flex: 2 }}><label style={lab}>Daytime phone</label><input style={inp} value={f.atFraudDayPhone} onChange={e => set("atFraudDayPhone", e.target.value)} /></div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} value={f.atFraudEveArea} onChange={e => set("atFraudEveArea", e.target.value)} /></div>
+              <div style={{ flex: 2 }}><label style={lab}>Evening phone</label><input style={inp} value={f.atFraudEvePhone} onChange={e => set("atFraudEvePhone", e.target.value)} /></div>
+            </div>
+            <label style={lab}>Email at the time</label><input style={inp} value={f.atFraudEmail} onChange={e => set("atFraudEmail", e.target.value)} />
+          </div>
+        )}
+
+        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
+        <label style={lab}>(11) Did you authorize anyone to use your information?</label>
+        {seg({ get: f.d11, set: v => set("d11", v) }, [["did", "I did"], ["didnot", "I did not"]])}
+        <label style={lab}>(12) Did you receive money/goods/services from it?</label>
+        {seg({ get: f.d12, set: v => set("d12", v) }, [["did", "I did"], ["didnot", "I did not"]])}
+        <label style={lab}>(13) Willing to work with law enforcement?</label>
+        {seg({ get: f.d13, set: v => set("d13", v) }, [["am", "I am"], ["amnot", "I am not"]])}
+
+        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
+        <label style={lab}>(14) Do you know, or believe you know, who used your information?</label>
+        {seg({ get: f.knowsPerson, set: v => set("knowsPerson", v) }, [["yes", "Yes"], ["no", "No / I don't know"]])}
+        {f.knowsPerson === "yes" && (
+          <div style={{ border: "1px solid #f1f5f9", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+            <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Enter only what you actually know. Incomplete is fine — leave the rest blank.</div>
+            <label style={lab}>Their name</label><input style={inp} value={f.person} onChange={e => set("person", e.target.value)} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 3 }}><label style={lab}>Number & street name</label><input style={inp} value={f.personAddr1} onChange={e => set("personAddr1", e.target.value)} /></div>
+              <div style={{ flex: 1 }}><label style={lab}>Apt / suite</label><input style={inp} value={f.personApt} onChange={e => set("personApt", e.target.value)} /></div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 2 }}><label style={lab}>City</label><input style={inp} value={f.personCity} onChange={e => set("personCity", e.target.value)} /></div>
+              <div style={{ flex: 1 }}><label style={lab}>State</label><input style={inp} value={f.personState} onChange={e => set("personState", e.target.value)} /></div>
+              <div style={{ flex: 1 }}><label style={lab}>ZIP</label><input style={inp} value={f.personZip} onChange={e => set("personZip", e.target.value)} /></div>
+              <div style={{ flex: 1 }}><label style={lab}>Country</label><input style={inp} value={f.personCountry} onChange={e => set("personCountry", e.target.value)} /></div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} value={f.personArea1} onChange={e => set("personArea1", e.target.value)} /></div>
+              <div style={{ flex: 2 }}><label style={lab}>Phone number</label><input style={inp} value={f.personPhone1} onChange={e => set("personPhone1", e.target.value)} /></div>
+              <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} value={f.personArea2} onChange={e => set("personArea2", e.target.value)} /></div>
+              <div style={{ flex: 2 }}><label style={lab}>Other phone</label><input style={inp} value={f.personPhone2} onChange={e => set("personPhone2", e.target.value)} /></div>
+            </div>
+            <label style={lab}>Anything else you know about this person</label>
+            <textarea value={f.personInfo} onChange={e => set("personInfo", e.target.value)} style={{ ...inp, minHeight: 56, resize: "vertical" }} />
+          </div>
+        )}
+
+        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>(19) The accounts/inquiries you say are fraud</div>
+        {accts.map((a, i) => (
+          <div key={i} style={{ border: "1px solid #f1f5f9", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED" }}>Item {i + 1}</span>
+              {accts.length > 1 && <button type="button" onClick={() => removeAcct(i)} style={{ background: "none", border: "none", color: "#cbd5e1", fontSize: 14, cursor: "pointer" }}>✕</button>}
+            </div>
+            <input style={inp} placeholder="Name of institution" value={a.institution} onChange={e => setAcct(i, "institution", e.target.value)} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <input style={{ ...inp, flex: 2 }} placeholder="Contact person (if known)" value={a.contact} onChange={e => setAcct(i, "contact", e.target.value)} />
+              <input style={{ ...inp, flex: 2 }} placeholder="Phone" value={a.phone} onChange={e => setAcct(i, "phone", e.target.value)} />
+              <input style={{ ...inp, flex: 1 }} placeholder="Ext." value={a.extension} onChange={e => setAcct(i, "extension", e.target.value)} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input style={{ ...inp, flex: 2 }} placeholder="Account number (if known)" value={a.accountNumber} onChange={e => setAcct(i, "accountNumber", e.target.value)} />
+              <input style={{ ...inp, flex: 2 }} placeholder="Routing number (if any)" value={a.routing} onChange={e => setAcct(i, "routing", e.target.value)} />
+              <input style={{ ...inp, flex: 2 }} placeholder="Affected check no(s)." value={a.checkNumbers} onChange={e => setAcct(i, "checkNumbers", e.target.value)} />
+            </div>
+            {seg({ get: a.type, set: v => setAcct(i, "type", v) }, [["credit", "Credit"], ["bank", "Bank"], ["phoneutil", "Phone/Util"], ["loan", "Loan"], ["govbenefits", "Gov't benefits"], ["internetemail", "Internet/Email"], ["other", "Other"]])}
+            {seg({ get: a.status, set: v => setAcct(i, "status", v) }, [["opened", "Opened fraudulently"], ["tampered", "Existing acct tampered"]])}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input style={{ ...inp, flex: 1 }} placeholder="Date opened mm/yyyy" value={a.dateOpened} onChange={e => setAcct(i, "dateOpened", e.target.value)} />
+              <input style={{ ...inp, flex: 1 }} placeholder="Date discovered mm/yyyy" value={a.dateDiscovered} onChange={e => setAcct(i, "dateDiscovered", e.target.value)} />
+            </div>
+            <input style={inp} placeholder="Total amount obtained ($)" value={a.amount} onChange={e => setAcct(i, "amount", e.target.value)} />
+          </div>
+        ))}
+        {accts.length < 3 && <button type="button" onClick={addAcct} style={{ background: "none", border: "1.5px dashed #c4b5fd", color: "#7C3AED", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>+ Add another item</button>}
+
+        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
+        <label style={lab}>(15) How the identity theft happened</label>
+        <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 6 }}>Keep this consistent with the personal statement you wrote in your own FTC report — the two are read side by side.</div>
+        <textarea value={f.crimeInfo} onChange={e => set("crimeInfo", e.target.value)} placeholder="In your own words, how the thief got your information." style={{ ...inp, minHeight: 68, resize: "vertical" }} />
+
+        <div style={{ ...lab, marginTop: 6, marginBottom: 6 }}>(16) Documents you're attaching to prove your identity</div>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "6px 0", cursor: "pointer" }}>
+          <input type="checkbox" checked={f.doc16ID} onChange={e => set("doc16ID", e.target.checked)} style={{ marginTop: 3, width: 16, height: 16 }} />
+          <span style={{ fontSize: 12.5, color: "#374151", lineHeight: 1.5 }}>Government photo ID (driver's license, state ID, or passport)</span>
+        </label>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "6px 0 10px", cursor: "pointer" }}>
+          <input type="checkbox" checked={f.doc16Proof} onChange={e => set("doc16Proof", e.target.checked)} style={{ marginTop: 3, width: 16, height: 16 }} />
+          <span style={{ fontSize: 12.5, color: "#374151", lineHeight: 1.5 }}>Proof of residency (lease, utility bill, or insurance bill)</span>
+        </label>
+
+        <label style={lab}>(17) Personal info on your report that's wrong because of the theft</label>
+        <input style={inp} placeholder="e.g. My report shows the wrong name — my correct name is..." value={f.info17A} onChange={e => set("info17A", e.target.value)} />
+        <input style={inp} placeholder="(optional second line)" value={f.info17B} onChange={e => set("info17B", e.target.value)} />
+        <input style={inp} placeholder="(optional third line)" value={f.info17C} onChange={e => set("info17C", e.target.value)} />
+
+        <label style={lab}>(18) Companies whose inquiries you say are from the theft</label>
+        <input style={inp} placeholder="Company name(s)" value={f.company18A} onChange={e => set("company18A", e.target.value)} />
+        <input style={inp} placeholder="(optional)" value={f.company18B} onChange={e => set("company18B", e.target.value)} />
+        <input style={inp} placeholder="(optional)" value={f.company18C} onChange={e => set("company18C", e.target.value)} />
+
+        <div style={{ ...lab, marginTop: 6, marginBottom: 6 }}>(20) Law enforcement report</div>
+        {seg({ get: f.law20, set: v => set("law20", v) }, [["notfiled", "Haven't filed"], ["unable", "Was unable to file"], ["automated", "Filed automated"], ["inperson", "Filed in person"]])}
+        <label style={lab}>Your FTC complaint number (if you filed at IdentityTheft.gov)</label>
+        <input style={inp} placeholder="FTC report number" value={f.ftcNumber} onChange={e => set("ftcNumber", e.target.value)} />
+
+        <button type="button" onClick={() => {
+          // If the client turned a section off, nothing from it goes onto the form.
+          const out = { ...f, accounts: accts };
+          if (out.changed !== "yes") Object.keys(out).forEach(k => { if (k.startsWith("atFraud")) out[k] = ""; });
+          if (out.knowsPerson !== "yes") ["person", "personAddr1", "personApt", "personCity", "personState", "personZip", "personCountry", "personArea1", "personPhone1", "personArea2", "personPhone2", "personInfo"].forEach(k => { out[k] = ""; });
+          setSaved(true);
+          onDone(out);
+        }} style={{ width: "100%", height: 44, borderRadius: 12, background: saved ? "#0f766e" : "linear-gradient(135deg,#7C3AED,#a855f7)", border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}>{saved ? "✓ Saved — save again to update" : "Save my affidavit answers"}</button>
+        <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginTop: 8, lineHeight: 1.5 }}>Your answers are kept as you type, so you can correct anything without starting over. You will print, sign, and notarize the form yourself — signature and notary are left blank.</div>
+      </div>
+    );
+  }
+
 function ClientApp() {
   const [tab,         setTab]         = useState(0);
   const [messages,    setMessages]    = useState([]);
@@ -309,6 +579,10 @@ function ClientApp() {
   const [dragActive,  setDragActive]  = useState(false);
   // Client-completed affidavit (blank until the client fills it in themselves).
   const [affidavitData, setAffidavitData] = useState(null);
+  // Live, unsaved affidavit answers. Held in a ref on purpose: the form reports every
+  // keystroke, and putting that in state would re-render the entire chat per character.
+  const affidavitDraftRef = useRef(null);
+  const affidavitDraftTimer = useRef(null);
   const [showAffidavit, setShowAffidavit] = useState(false);
   // Track whether the client entered the identity-theft flow (so we don't claim the
   // packet is "done" while the FTC report / affidavit steps are still open), and make
@@ -419,15 +693,52 @@ function ClientApp() {
           if (s.statusTxt) setStatusTxt(s.statusTxt);
           if (s.approved) setApproved(true);
           if (s.clientId) setClientId(s.clientId);
-          if (s.affidavitData) setAffidavitData(s.affidavitData);
-          if (s.idTheftStarted) setIdTheftStarted(true);
+          if (s.affidavitData) setAffidavitData(s.affidavitData);          if (s.idTheftStarted) setIdTheftStarted(true);
           if (s.announcedReady) setAnnouncedReady(true);
           didRestore = true;
         }
       }
     } catch (e) { console.error("restore error:", e.message); }
+    // A draft is answers the client typed but never pressed Save on. Recover it so a
+    // refresh, a crashed tab, or a phone killing the page costs them nothing.
+    try {
+      const d = localStorage.getItem(AFFIDAVIT_DRAFT_KEY);
+      if (d) { const parsed = JSON.parse(d); if (parsed && typeof parsed === "object") affidavitDraftRef.current = parsed; }
+    } catch (e) { console.error("draft restore error:", e.message); }
     setRestored(true);
     if (!didRestore) initAgent();
+  }, []);
+
+  // Debounced writer for the live draft, plus a flush on unload so the last few
+  // keystrokes before someone closes the tab still land.
+  function saveAffidavitDraft(next) {
+    affidavitDraftRef.current = next;
+    if (affidavitDraftTimer.current) clearTimeout(affidavitDraftTimer.current);
+    affidavitDraftTimer.current = setTimeout(() => {
+      try { localStorage.setItem(AFFIDAVIT_DRAFT_KEY, JSON.stringify(affidavitDraftRef.current)); }
+      catch (e) { console.error("draft save failed:", e.message); }
+    }, 400);
+  }
+
+  function clearAffidavitDraft() {
+    if (affidavitDraftTimer.current) clearTimeout(affidavitDraftTimer.current);
+    affidavitDraftRef.current = null;
+    try { localStorage.removeItem(AFFIDAVIT_DRAFT_KEY); } catch {}
+  }
+
+  useEffect(() => {
+    const flush = () => {
+      if (!affidavitDraftRef.current) return;
+      try { localStorage.setItem(AFFIDAVIT_DRAFT_KEY, JSON.stringify(affidavitDraftRef.current)); } catch {}
+    };
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      if (affidavitDraftTimer.current) clearTimeout(affidavitDraftTimer.current);
+      flush();
+    };
   }, []);
 
   // Autosave progress so a client can close the tab and resume where they left off.
@@ -454,6 +765,7 @@ function ClientApp() {
     setUploads([]); setProgress(0); setStatusTxt("Ready to begin"); setApproved(false);
     setClientId(null); setProfile(null); profileRef.current = null; setDocTab("equifax"); setTab(0);
     setAffidavitData(null); setShowAffidavit(false);
+    clearAffidavitDraft();
     setIdTheftStarted(false); setAnnouncedReady(false);
     initAgent();
   }
@@ -816,14 +1128,22 @@ function ClientApp() {
     setBusy(false);
   }
 
-  // Drop the affidavit fill-in form into the chat on demand (always reachable).
+  // Drop the affidavit fill-in form into the chat on demand (always reachable). If a form
+  // is already open we scroll to it instead of pushing a second one — two live copies
+  // would fight over the same draft and one of them would lose.
   function openAffidavitInChat() {
     setTab(0);
-    setMessages(prev => [
-      ...prev,
-      { from: "agent", text: "If any items on your report were opened or used by an identity thief, fill out the official FTC affidavit below in your own words. Only complete it if you are genuinely a victim — otherwise you can skip it and we'll dispute on accuracy grounds. You'll sign and notarize it yourself." },
-      { from: "affidavit_form" },
-    ]);
+    setMessages(prev => {
+      if (prev.some(m => m.from === "affidavit_form")) return prev;
+      const editing = !!(affidavitData && affidavitData.completed);
+      return [
+        ...prev,
+        { from: "agent", text: editing
+          ? "Here are the answers you already gave. Change anything you need to and save again — your earlier answers are loaded in for you, so nothing has to be retyped."
+          : "If any items on your report were opened or used by an identity thief, fill out the official FTC affidavit below in your own words. Only complete it if you are genuinely a victim — otherwise you can skip it and we'll dispute on accuracy grounds. You'll sign and notarize it yourself." },
+        { from: "affidavit_form" },
+      ];
+    });
   }
 
   // Drop the FTC report upload box into the chat on demand.
@@ -836,14 +1156,18 @@ function ClientApp() {
     ]);
   }
 
-  // Client finished the in-chat affidavit form: save their answers and continue.
+  // Client finished the in-chat affidavit form: save their answers and continue. The form
+  // itself stays on screen so they can immediately correct a typo they just spotted —
+  // replacing it with a text bubble is what made the last round of edits feel destructive.
   function completeAffidavit(ans) {
     setAffidavitData({ ...ans, completed: true });
+    clearAffidavitDraft();
     setMessages(prev => {
+      if (prev.some(m => m.savedNote)) return prev;
+      const idx = prev.map(m => m.from).lastIndexOf("affidavit_form");
+      if (idx === -1) return prev;
       const copy = [...prev];
-      for (let i = copy.length - 1; i >= 0; i--) {
-        if (copy[i].from === "affidavit_form") { copy[i] = { from: "agent", text: "Saved. Your answers will be printed onto the official FTC affidavit in your packet, ready for you to sign and notarize. You can edit them any time in Package → Affidavit." }; break; }
-      }
+      copy.splice(idx + 1, 0, { from: "agent", savedNote: true, text: "Saved. Your answers will be printed onto the official FTC affidavit in your packet, ready for you to sign and notarize. The form above stays open — change anything and press save again. You can also reopen it any time from Package → Affidavit." });
       return copy;
     });
     setTimeout(() => sendProgrammatic("I've completed my identity theft affidavit in the app."), 400);
@@ -1326,229 +1650,7 @@ function ClientApp() {
     r.readAsDataURL(file);
   }
 
-  // Inline card: upload the client's own FTC report (they create it at IdentityTheft.gov).
-  function FtcUploadCard({ onUpload }) {
-    const ref = useRef(null);
-    return (
-      <div style={{ maxWidth: "85%", background: "#fff", border: "1px solid #dbeafe", borderRadius: "4px 16px 16px 16px", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Upload your FTC report</div>
-        <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.6, marginBottom: 12 }}>File your report at IdentityTheft.gov, download the PDF it gives you, then add it here. It will be attached to your packet.</div>
-        <button onClick={() => ref.current?.click()} style={{ padding: "10px 16px", background: "#1e3a8a", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Choose FTC report file</button>
-        <input ref={ref} type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) onUpload(e.target.files[0]); e.target.value = ""; }} />
-      </div>
-    );
-  }
 
-  // Inline card: the client types their OWN answers; nothing is pre-filled from the
-  // credit report. On submit the answers are printed onto the official FTC affidavit.
-  function AffidavitChatForm({ onDone }) {
-    const seed = splitAddress(pkg?.clientAddress || "");
-    const [f, setF] = useState({
-      fullName: pkg?.clientName || "", dob: pkg?.dob || "", ssn: "", dlState: "", dlNumber: "",
-      addr1: seed.street, apt: "", city: seed.city, state: seed.state, zip: seed.zip, country: "",
-      since: "", dayArea: "", dayPhone: "", eveArea: "", evePhone: "", email: "",
-      changed: "", atFraudName: "", atFraudAddr1: "", atFraudApt: "", atFraudCity: "", atFraudState: "",
-      atFraudZip: "", atFraudCountry: "", atFraudDayArea: "", atFraudDayPhone: "", atFraudEveArea: "",
-      atFraudEvePhone: "", atFraudEmail: "",
-      d11: "", d12: "", d13: "",
-      knowsPerson: "", person: "", personAddr1: "", personApt: "", personCity: "", personState: "",
-      personZip: "", personCountry: "", personArea1: "", personPhone1: "", personArea2: "", personPhone2: "", personInfo: "",
-      crimeInfo: "", doc16ID: false, doc16Proof: false,
-      info17A: "", info17B: "", info17C: "",
-      company18A: "", company18B: "", company18C: "",
-      law20: "", ftcNumber: "",
-    });
-    const blankAcct = { institution: "", contact: "", phone: "", extension: "", accountNumber: "", routing: "", checkNumbers: "", type: "", status: "", dateOpened: "", dateDiscovered: "", amount: "" };
-    const [accts, setAccts] = useState([{ ...blankAcct }]);
-    const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
-    const setAcct = (i, k, v) => setAccts(prev => prev.map((a, idx) => idx === i ? { ...a, [k]: v } : a));
-    const addAcct = () => setAccts(prev => prev.length >= 3 ? prev : [...prev, { ...blankAcct }]);
-    const removeAcct = (i) => setAccts(prev => prev.filter((_, idx) => idx !== i));
-
-    const inp = { width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", marginBottom: 8 };
-    const lab = { fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 3, display: "block" };
-    const seg = (val, opts) => (
-      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-        {opts.map(([v, label]) => (
-          <button key={v} type="button" onClick={() => val.set(v)} style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${val.get === v ? "#1e3a8a" : "#e2e8f0"}`, background: val.get === v ? "#1e3a8a" : "#fff", color: val.get === v ? "#fff" : "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
-        ))}
-      </div>
-    );
-
-    return (
-      <div style={{ maxWidth: "92%", background: "#fff", border: "1px solid #e9d5ff", borderRadius: "4px 16px 16px 16px", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,.05)", maxHeight: 460, overflowY: "auto" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>Identity Theft Affidavit</div>
-        <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.55, marginBottom: 10 }}>Fill this in yourself. Your answers print onto the official FTC form for you to sign and notarize. Only include what you personally know to be true — this is sworn under penalty of perjury.</div>
-
-        <label style={lab}>Full legal name</label><input style={inp} value={f.fullName} onChange={e => set("fullName", e.target.value)} />
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ flex: 1 }}><label style={lab}>Date of birth</label><input style={inp} placeholder="mm/dd/yyyy" value={f.dob} onChange={e => set("dob", e.target.value)} /></div>
-          <div style={{ flex: 1 }}><label style={lab}>SSN</label><input style={inp} value={f.ssn} onChange={e => set("ssn", e.target.value)} /></div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ flex: 1 }}><label style={lab}>Driver's license state</label><input style={inp} value={f.dlState} onChange={e => set("dlState", e.target.value)} /></div>
-          <div style={{ flex: 2 }}><label style={lab}>Driver's license number</label><input style={inp} value={f.dlNumber} onChange={e => set("dlNumber", e.target.value)} /></div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ flex: 3 }}><label style={lab}>Number & street name</label><input style={inp} value={f.addr1} onChange={e => set("addr1", e.target.value)} /></div>
-          <div style={{ flex: 1 }}><label style={lab}>Apt / suite</label><input style={inp} value={f.apt} onChange={e => set("apt", e.target.value)} /></div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ flex: 2 }}><label style={lab}>City</label><input style={inp} value={f.city} onChange={e => set("city", e.target.value)} /></div>
-          <div style={{ flex: 1 }}><label style={lab}>State</label><input style={inp} value={f.state} onChange={e => set("state", e.target.value)} /></div>
-          <div style={{ flex: 1 }}><label style={lab}>ZIP</label><input style={inp} value={f.zip} onChange={e => set("zip", e.target.value)} /></div>
-          <div style={{ flex: 1 }}><label style={lab}>Country</label><input style={inp} value={f.country} onChange={e => set("country", e.target.value)} /></div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ flex: 1 }}><label style={lab}>Lived here since</label><input style={inp} placeholder="mm/yyyy" value={f.since} onChange={e => set("since", e.target.value)} /></div>
-          <div style={{ flex: 1 }}><label style={lab}>Email</label><input style={inp} value={f.email} onChange={e => set("email", e.target.value)} /></div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} placeholder="619" value={f.dayArea} onChange={e => set("dayArea", e.target.value)} /></div>
-          <div style={{ flex: 2 }}><label style={lab}>Daytime phone</label><input style={inp} value={f.dayPhone} onChange={e => set("dayPhone", e.target.value)} /></div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} placeholder="619" value={f.eveArea} onChange={e => set("eveArea", e.target.value)} /></div>
-          <div style={{ flex: 2 }}><label style={lab}>Evening phone</label><input style={inp} value={f.evePhone} onChange={e => set("evePhone", e.target.value)} /></div>
-        </div>
-
-        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 6 }}>(8)–(10) At the time of the fraud</div>
-        <label style={lab}>Has your name, address, or phone changed since the fraud happened?</label>
-        {seg({ get: f.changed, set: v => set("changed", v) }, [["yes", "Yes, it changed"], ["no", "No, same as above"]])}
-        {f.changed === "yes" && (
-          <div style={{ border: "1px solid #f1f5f9", borderRadius: 10, padding: 10, marginBottom: 10 }}>
-            <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Enter what your information was back then. Leave anything that didn't change blank.</div>
-            <label style={lab}>Full legal name at the time</label><input style={inp} value={f.atFraudName} onChange={e => set("atFraudName", e.target.value)} />
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 3 }}><label style={lab}>Number & street name</label><input style={inp} value={f.atFraudAddr1} onChange={e => set("atFraudAddr1", e.target.value)} /></div>
-              <div style={{ flex: 1 }}><label style={lab}>Apt / suite</label><input style={inp} value={f.atFraudApt} onChange={e => set("atFraudApt", e.target.value)} /></div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 2 }}><label style={lab}>City</label><input style={inp} value={f.atFraudCity} onChange={e => set("atFraudCity", e.target.value)} /></div>
-              <div style={{ flex: 1 }}><label style={lab}>State</label><input style={inp} value={f.atFraudState} onChange={e => set("atFraudState", e.target.value)} /></div>
-              <div style={{ flex: 1 }}><label style={lab}>ZIP</label><input style={inp} value={f.atFraudZip} onChange={e => set("atFraudZip", e.target.value)} /></div>
-              <div style={{ flex: 1 }}><label style={lab}>Country</label><input style={inp} value={f.atFraudCountry} onChange={e => set("atFraudCountry", e.target.value)} /></div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} value={f.atFraudDayArea} onChange={e => set("atFraudDayArea", e.target.value)} /></div>
-              <div style={{ flex: 2 }}><label style={lab}>Daytime phone</label><input style={inp} value={f.atFraudDayPhone} onChange={e => set("atFraudDayPhone", e.target.value)} /></div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} value={f.atFraudEveArea} onChange={e => set("atFraudEveArea", e.target.value)} /></div>
-              <div style={{ flex: 2 }}><label style={lab}>Evening phone</label><input style={inp} value={f.atFraudEvePhone} onChange={e => set("atFraudEvePhone", e.target.value)} /></div>
-            </div>
-            <label style={lab}>Email at the time</label><input style={inp} value={f.atFraudEmail} onChange={e => set("atFraudEmail", e.target.value)} />
-          </div>
-        )}
-
-        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
-        <label style={lab}>(11) Did you authorize anyone to use your information?</label>
-        {seg({ get: f.d11, set: v => set("d11", v) }, [["did", "I did"], ["didnot", "I did not"]])}
-        <label style={lab}>(12) Did you receive money/goods/services from it?</label>
-        {seg({ get: f.d12, set: v => set("d12", v) }, [["did", "I did"], ["didnot", "I did not"]])}
-        <label style={lab}>(13) Willing to work with law enforcement?</label>
-        {seg({ get: f.d13, set: v => set("d13", v) }, [["am", "I am"], ["amnot", "I am not"]])}
-
-        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
-        <label style={lab}>(14) Do you know, or believe you know, who used your information?</label>
-        {seg({ get: f.knowsPerson, set: v => set("knowsPerson", v) }, [["yes", "Yes"], ["no", "No / I don't know"]])}
-        {f.knowsPerson === "yes" && (
-          <div style={{ border: "1px solid #f1f5f9", borderRadius: 10, padding: 10, marginBottom: 10 }}>
-            <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Enter only what you actually know. Incomplete is fine — leave the rest blank.</div>
-            <label style={lab}>Their name</label><input style={inp} value={f.person} onChange={e => set("person", e.target.value)} />
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 3 }}><label style={lab}>Number & street name</label><input style={inp} value={f.personAddr1} onChange={e => set("personAddr1", e.target.value)} /></div>
-              <div style={{ flex: 1 }}><label style={lab}>Apt / suite</label><input style={inp} value={f.personApt} onChange={e => set("personApt", e.target.value)} /></div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 2 }}><label style={lab}>City</label><input style={inp} value={f.personCity} onChange={e => set("personCity", e.target.value)} /></div>
-              <div style={{ flex: 1 }}><label style={lab}>State</label><input style={inp} value={f.personState} onChange={e => set("personState", e.target.value)} /></div>
-              <div style={{ flex: 1 }}><label style={lab}>ZIP</label><input style={inp} value={f.personZip} onChange={e => set("personZip", e.target.value)} /></div>
-              <div style={{ flex: 1 }}><label style={lab}>Country</label><input style={inp} value={f.personCountry} onChange={e => set("personCountry", e.target.value)} /></div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} value={f.personArea1} onChange={e => set("personArea1", e.target.value)} /></div>
-              <div style={{ flex: 2 }}><label style={lab}>Phone number</label><input style={inp} value={f.personPhone1} onChange={e => set("personPhone1", e.target.value)} /></div>
-              <div style={{ flex: 1 }}><label style={lab}>Area code</label><input style={inp} value={f.personArea2} onChange={e => set("personArea2", e.target.value)} /></div>
-              <div style={{ flex: 2 }}><label style={lab}>Other phone</label><input style={inp} value={f.personPhone2} onChange={e => set("personPhone2", e.target.value)} /></div>
-            </div>
-            <label style={lab}>Anything else you know about this person</label>
-            <textarea value={f.personInfo} onChange={e => set("personInfo", e.target.value)} style={{ ...inp, minHeight: 56, resize: "vertical" }} />
-          </div>
-        )}
-
-        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>(19) The accounts/inquiries you say are fraud</div>
-        {accts.map((a, i) => (
-          <div key={i} style={{ border: "1px solid #f1f5f9", borderRadius: 10, padding: 10, marginBottom: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED" }}>Item {i + 1}</span>
-              {accts.length > 1 && <button type="button" onClick={() => removeAcct(i)} style={{ background: "none", border: "none", color: "#cbd5e1", fontSize: 14, cursor: "pointer" }}>✕</button>}
-            </div>
-            <input style={inp} placeholder="Name of institution" value={a.institution} onChange={e => setAcct(i, "institution", e.target.value)} />
-            <div style={{ display: "flex", gap: 8 }}>
-              <input style={{ ...inp, flex: 2 }} placeholder="Contact person (if known)" value={a.contact} onChange={e => setAcct(i, "contact", e.target.value)} />
-              <input style={{ ...inp, flex: 2 }} placeholder="Phone" value={a.phone} onChange={e => setAcct(i, "phone", e.target.value)} />
-              <input style={{ ...inp, flex: 1 }} placeholder="Ext." value={a.extension} onChange={e => setAcct(i, "extension", e.target.value)} />
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input style={{ ...inp, flex: 2 }} placeholder="Account number (if known)" value={a.accountNumber} onChange={e => setAcct(i, "accountNumber", e.target.value)} />
-              <input style={{ ...inp, flex: 2 }} placeholder="Routing number (if any)" value={a.routing} onChange={e => setAcct(i, "routing", e.target.value)} />
-              <input style={{ ...inp, flex: 2 }} placeholder="Affected check no(s)." value={a.checkNumbers} onChange={e => setAcct(i, "checkNumbers", e.target.value)} />
-            </div>
-            {seg({ get: a.type, set: v => setAcct(i, "type", v) }, [["credit", "Credit"], ["bank", "Bank"], ["phoneutil", "Phone/Util"], ["loan", "Loan"], ["govbenefits", "Gov't benefits"], ["internetemail", "Internet/Email"], ["other", "Other"]])}
-            {seg({ get: a.status, set: v => setAcct(i, "status", v) }, [["opened", "Opened fraudulently"], ["tampered", "Existing acct tampered"]])}
-            <div style={{ display: "flex", gap: 8 }}>
-              <input style={{ ...inp, flex: 1 }} placeholder="Date opened mm/yyyy" value={a.dateOpened} onChange={e => setAcct(i, "dateOpened", e.target.value)} />
-              <input style={{ ...inp, flex: 1 }} placeholder="Date discovered mm/yyyy" value={a.dateDiscovered} onChange={e => setAcct(i, "dateDiscovered", e.target.value)} />
-            </div>
-            <input style={inp} placeholder="Total amount obtained ($)" value={a.amount} onChange={e => setAcct(i, "amount", e.target.value)} />
-          </div>
-        ))}
-        {accts.length < 3 && <button type="button" onClick={addAcct} style={{ background: "none", border: "1.5px dashed #c4b5fd", color: "#7C3AED", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>+ Add another item</button>}
-
-        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
-        <label style={lab}>(15) How the identity theft happened</label>
-        <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 6 }}>Keep this consistent with the personal statement you wrote in your own FTC report — the two are read side by side.</div>
-        <textarea value={f.crimeInfo} onChange={e => set("crimeInfo", e.target.value)} placeholder="In your own words, how the thief got your information." style={{ ...inp, minHeight: 68, resize: "vertical" }} />
-
-        <div style={{ ...lab, marginTop: 6, marginBottom: 6 }}>(16) Documents you're attaching to prove your identity</div>
-        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "6px 0", cursor: "pointer" }}>
-          <input type="checkbox" checked={f.doc16ID} onChange={e => set("doc16ID", e.target.checked)} style={{ marginTop: 3, width: 16, height: 16 }} />
-          <span style={{ fontSize: 12.5, color: "#374151", lineHeight: 1.5 }}>Government photo ID (driver's license, state ID, or passport)</span>
-        </label>
-        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "6px 0 10px", cursor: "pointer" }}>
-          <input type="checkbox" checked={f.doc16Proof} onChange={e => set("doc16Proof", e.target.checked)} style={{ marginTop: 3, width: 16, height: 16 }} />
-          <span style={{ fontSize: 12.5, color: "#374151", lineHeight: 1.5 }}>Proof of residency (lease, utility bill, or insurance bill)</span>
-        </label>
-
-        <label style={lab}>(17) Personal info on your report that's wrong because of the theft</label>
-        <input style={inp} placeholder="e.g. My report shows the wrong name — my correct name is..." value={f.info17A} onChange={e => set("info17A", e.target.value)} />
-        <input style={inp} placeholder="(optional second line)" value={f.info17B} onChange={e => set("info17B", e.target.value)} />
-        <input style={inp} placeholder="(optional third line)" value={f.info17C} onChange={e => set("info17C", e.target.value)} />
-
-        <label style={lab}>(18) Companies whose inquiries you say are from the theft</label>
-        <input style={inp} placeholder="Company name(s)" value={f.company18A} onChange={e => set("company18A", e.target.value)} />
-        <input style={inp} placeholder="(optional)" value={f.company18B} onChange={e => set("company18B", e.target.value)} />
-        <input style={inp} placeholder="(optional)" value={f.company18C} onChange={e => set("company18C", e.target.value)} />
-
-        <div style={{ ...lab, marginTop: 6, marginBottom: 6 }}>(20) Law enforcement report</div>
-        {seg({ get: f.law20, set: v => set("law20", v) }, [["notfiled", "Haven't filed"], ["unable", "Was unable to file"], ["automated", "Filed automated"], ["inperson", "Filed in person"]])}
-        <label style={lab}>Your FTC complaint number (if you filed at IdentityTheft.gov)</label>
-        <input style={inp} placeholder="FTC report number" value={f.ftcNumber} onChange={e => set("ftcNumber", e.target.value)} />
-
-        <button type="button" onClick={() => {
-          // If the client turned a section off, nothing from it goes onto the form.
-          const out = { ...f, accounts: accts };
-          if (out.changed !== "yes") Object.keys(out).forEach(k => { if (k.startsWith("atFraud")) out[k] = ""; });
-          if (out.knowsPerson !== "yes") ["person", "personAddr1", "personApt", "personCity", "personState", "personZip", "personCountry", "personArea1", "personPhone1", "personArea2", "personPhone2", "personInfo"].forEach(k => { out[k] = ""; });
-          onDone(out);
-        }} style={{ width: "100%", height: 44, borderRadius: 12, background: "linear-gradient(135deg,#7C3AED,#a855f7)", border: "none", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}>Save my affidavit answers</button>
-        <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginTop: 8, lineHeight: 1.5 }}>You will print, sign, and notarize the form yourself. Signature and notary are left blank.</div>
-      </div>
-    );
-  }
 
 
   const personalInfoPreview = pkg && pkg.personalInfoNeeded ? buildPersonalInfoText("equifax") : "";
@@ -1640,14 +1742,21 @@ function ClientApp() {
             <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
               {messages.map((m, i) => (
                 m.from === "ftc_upload" ? (
-                  <div key={i} className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+                  <div key="ftc_upload" className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
                     <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
                     <FtcUploadCard onUpload={completeFtcUpload} />
                   </div>
                 ) : m.from === "affidavit_form" ? (
-                  <div key={i} className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+                  <div key="affidavit_form" className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
                     <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
-                    <AffidavitChatForm onDone={completeAffidavit} />
+                    <AffidavitChatForm
+                      initial={affidavitDraftRef.current || affidavitData}
+                      seedName={pkg?.clientName || ""}
+                      seedAddress={pkg?.clientAddress || ""}
+                      seedDob={pkg?.dob || ""}
+                      onDraft={saveAffidavitDraft}
+                      onDone={completeAffidavit}
+                    />
                   </div>
                 ) : (
                 <div key={i} className="msg" style={m.from === "user" ? { display: "flex", justifyContent: "flex-end" } : { display: "flex", alignItems: "flex-end", gap: 10 }}>
