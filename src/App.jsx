@@ -670,9 +670,22 @@ function ClientApp() {
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
   const fileRef   = useRef(null);
+  // When the client asks to edit the affidavit, we want the chat to land ON the form, not
+  // at the bottom of the conversation. This flag is set only by the two edit entry points
+  // and consumed once, so normal new messages still scroll to the bottom as before.
+  const affidavitFormRef = useRef(null);
+  const scrollToAffidavit = useRef(false);
   const ready     = !!pkg;
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
+  useEffect(() => {
+    if (scrollToAffidavit.current) {
+      scrollToAffidavit.current = false;
+      // Let the form mount first, then bring it into view at the top of the scroll area.
+      const el = affidavitFormRef.current;
+      if (el) { requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "start" })); return; }
+    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, busy]);
 
   // On load: resume this client's saved progress if any; otherwise start a fresh intake.
   useEffect(() => {
@@ -1128,13 +1141,20 @@ function ClientApp() {
     setBusy(false);
   }
 
-  // Drop the affidavit fill-in form into the chat on demand (always reachable). If a form
-  // is already open we scroll to it instead of pushing a second one — two live copies
-  // would fight over the same draft and one of them would lose.
+  // Drop the affidavit fill-in form into the chat on demand (always reachable), and ask
+  // the chat to scroll straight to it so the client never has to hunt for it. If a form is
+  // already open we don't push a second one — two live copies would fight over the same
+  // draft — we just scroll to the existing one.
   function openAffidavitInChat() {
     setTab(0);
+    scrollToAffidavit.current = true;
     setMessages(prev => {
-      if (prev.some(m => m.from === "affidavit_form")) return prev;
+      if (prev.some(m => m.from === "affidavit_form")) {
+        // Already open: no message change fires the scroll effect, so do it directly.
+        scrollToAffidavit.current = false;
+        requestAnimationFrame(() => affidavitFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+        return prev;
+      }
       const editing = !!(affidavitData && affidavitData.completed);
       return [
         ...prev,
@@ -1747,7 +1767,7 @@ function ClientApp() {
                     <FtcUploadCard onUpload={completeFtcUpload} />
                   </div>
                 ) : m.from === "affidavit_form" ? (
-                  <div key="affidavit_form" className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+                  <div key="affidavit_form" ref={affidavitFormRef} className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10, scrollMarginTop: 12 }}>
                     <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
                     <AffidavitChatForm
                       initial={affidavitDraftRef.current || affidavitData}
