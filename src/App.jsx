@@ -64,7 +64,7 @@ The name on the credit report is not always the name the client wants used (for 
 DOCUMENT PREP RULES:
 - Photo ID: show the photo and all four corners, legible, no glare/dark spots — bureaus reject cropped corners.
 - Social Security card: show all four corners AND the signature on the front. Both the corners and the signature must be visible.
-- Proof of address: no signature is needed. It must clearly show the client's name, current address, and the date. A utility bill or bank statement works.
+- Proof of address: no signature is needed. It must clearly show the client's name and current address. The DATE must be cropped out or covered — it must NOT be visible. A utility bill or bank statement works.
 - Highlighter: yellow or blue only. Never pink (shows as redacted black on TransUnion).
 - Dates always with separators: 01/15/2025 or January 15th 2025 — never 01152025.
 - If no SSN card: W-2, 1099, pay stub, bank loan docs, 1040, or SSA letter can substitute.
@@ -149,6 +149,7 @@ WHEN TO ASK (sequence): Once the client has provided the credit report, photo ID
 IN-CHAT IDENTITY-THEFT STEPS: When the client answers that one or more items WERE identity theft, in your next reply:
 - Briefly tell them to file their own report at IdentityTheft.gov, then output the token FTC_REPORT_STEP on its own line (an upload box for the report they create).
 - Then guide them to complete the official FTC affidavit and output the token AFFIDAVIT_STEP on its own line. The fill-in form opens in the chat for THEM to type their own answers, which print onto the official FTC form to sign and notarize.
+IDENTITY-THEFT PATH IS STICKY: Once the client has said an item was identity theft, both the FTC report AND the affidavit are required parts of their packet. If you still need other documents (photo ID, SSN card, proof of address), collect them, but you must NOT let the affidavit fall off. After the FTC report is uploaded, the app shows the affidavit form automatically — do not tell the client the intake is finished, do not ask "shall I build the packages," and do not output PACKAGE_READY as if everything is done while the affidavit is still outstanding. The letters may be built in parallel, but every reply while the affidavit is incomplete must state plainly that the packet is not complete to mail until the client completes the affidavit. Never imply the case is ready when the affidavit is still open.
 HOW TO GUIDE THE FORM (do this when you show AFFIDAVIT_STEP): explain how to complete it, not what to claim. Tell them: enter your legal name, date of birth, SSN, driver's license, and current address; answer whether your name, address or phone has changed since the fraud, and if it has, enter what they were then; for the three declarations, check only what is true for you; the form asks whether you know who used your information — answer no and skip it if you don't, and enter only what you actually know if you do; the description of how the theft happened should match the personal statement in your own FTC report; in the accounts section, list ONLY the specific items you personally know were opened or used without your authorization — in your own words; then print, sign, and have it notarized. You may explain what each field means. You must NOT tell the client which accounts to list, must NOT suggest that any identified negative is fraud, and must NOT characterize items as identity theft on their behalf. The choice of which items to include is entirely theirs.
 Output each token at most once. If the client says none were identity theft (only inaccurate or not theirs), do NOT output the tokens — proceed to build and dispute on accuracy grounds under Section 611.
 
@@ -161,7 +162,7 @@ DOCUMENTS TO COLLECT
 1. Credit report (MyFreeScoreNow) — to identify items.
 2. Government photo ID — show the photo and all four corners, no glare.
 3. Social Security card — all four corners AND the signature on the front.
-4. Proof of current address — utility bill or bank statement showing your name, current address, and the date. No signature needed.
+4. Proof of current address — utility bill or bank statement showing your name and current address. The date must be cropped out or covered so it is not visible. No signature needed.
 5. (Optional) Identity Theft Affidavit — only if the client is a genuine victim and completes the app's affidavit step; never required, never blocked on.
 
 TWO WAYS THE CLIENT CAN UPLOAD — support BOTH:
@@ -178,7 +179,7 @@ When you have the client name, address, DOB, SSN last-4, and the items the clien
 Output EXACTLY this (your short reply text may precede it if a question remains). The three bureau letters MUST be the COVER LETTER template reproduced word for word — only the bureau name/address, the client's info, and the numbered item lines change:
 
 PACKAGE_READY:
-{"clientName":"[full name]","clientAddress":"[full address]","dob":"[dob]","ssn4":"[last 4]","equifax":"[the Section 611 COVER LETTER reproduced verbatim, addressed to Equifax, items as numbered lines]","experian":"[same letter, addressed to Experian]","transunion":"[same letter, addressed to TransUnion]","personalInfoNeeded":true_or_false,"handwrittenNote":"Copy this letter by hand word for word on plain white paper in blue or black ink. Handwriting it shows the bureau this is a personal request, not a printed template. Do not type it.","disputeItems":{"equifax":["CREDITOR — TYPE — date"],"experian":["..."],"transunion":["..."]},"checklist":["MyFreeScoreNow credit report — relevant pages, highlighted in yellow or blue, NO pink","Government photo ID — show the photo and all four corners, no dark spots","Social Security card — all four corners AND the signature on the front","Proof of current address — utility bill or bank statement showing name, address, and date (no signature needed)","Identity Theft Affidavit — ONLY if you are a genuine identity theft victim and completed it yourself; notarized","FCRA 605B page (added automatically)"],"packetOrder":"1. Cover Letter (handwritten) → 2. Personal Info Letter (if needed) → 3. ID Page → 4. Credit Report Pages → 5. Affidavit (only if you completed it) → 6. FCRA 605B","brandonsNotes":"[2-3 sentences for Brandon: anything unusual or worth double-checking]"}
+{"clientName":"[full name]","clientAddress":"[full address]","dob":"[dob]","ssn4":"[last 4]","equifax":"[the Section 611 COVER LETTER reproduced verbatim, addressed to Equifax, items as numbered lines]","experian":"[same letter, addressed to Experian]","transunion":"[same letter, addressed to TransUnion]","personalInfoNeeded":true_or_false,"handwrittenNote":"Copy this letter by hand word for word on plain white paper in blue or black ink. Handwriting it shows the bureau this is a personal request, not a printed template. Do not type it.","disputeItems":{"equifax":["CREDITOR — TYPE — date"],"experian":["..."],"transunion":["..."]},"checklist":["MyFreeScoreNow credit report — relevant pages, highlighted in yellow or blue, NO pink","Government photo ID — show the photo and all four corners, no dark spots","Social Security card — all four corners AND the signature on the front","Proof of current address — utility bill or bank statement showing name and address; crop out or cover the date so it is not visible (no signature needed)","Identity Theft Affidavit — ONLY if you are a genuine identity theft victim and completed it yourself; notarized","FCRA 605B page (added automatically)"],"packetOrder":"1. Cover Letter (handwritten) → 2. Personal Info Letter (if needed) → 3. ID Page → 4. Credit Report Pages → 5. Affidavit (only if you completed it) → 6. FCRA 605B","brandonsNotes":"[2-3 sentences for Brandon: anything unusual or worth double-checking]"}
 
 ═══════════════════════════════════════════
 MEMORY PROTOCOL — CRITICAL (this is what stops re-asking)
@@ -262,7 +263,7 @@ const GUIDE = [
   { phase: "Phase 1", color: "#1E40AF", title: "Get Your MyFreeScoreNow Report", body: "Go to MyFreeScoreNow.com — this is your primary credit report. It shows all 3 bureaus with real FICO scores.\n\nLog in → 3B Reports → switch to Classic View (orange button) → right-click Save As → save as a single webpage / PDF.\n\nAlternative: IdentityIQ or MyScoreIQ also work. Don't use Credit Karma or the Experian app as your dispute source — they don't hold weight." },
   { phase: "Phase 2 · Step 1", color: "#D97706", title: "Identify the Items to Dispute", body: "Review your report with the agent and decide which items you believe are inaccurate, incomplete, or not yours. You choose what goes on the letters — the agent never decides that for you.\n\nFor each item, the basis is accuracy: the bureau must verify it with the furnisher, and anything that cannot be verified must be corrected or deleted under FCRA Section 611.\n\nIf you are a genuine victim of identity theft, you can additionally complete the affidavit step in the app yourself, and file your own report at IdentityTheft.gov." },
   { phase: "Phase 2 · Step 2", color: "#6D28D9", title: "Build Your Packet (Per Bureau)", body: "One packet per bureau in this order:\n1. Cover Letter (handwritten — copy the app's letter)\n2. Personal Information Update Letter (only if your personal info is wrong)\n3. ID Page (photo ID + SSN card + proof of address)\n4. Credit Report pages\n5. Affidavit — only if you are a victim and completed it yourself\n6. FCRA 605B page\n\nThe app builds the combined PDF for each bureau. Download all three from the Package tab and mail each via USPS Certified Mail with tracking." },
-  { phase: "Phase 2 · Step 3", color: "#059669", title: "Document Preparation Rules", body: "Photo ID: show the photo and all four corners, legible, no light/dark spots. Never crop corners.\n\nSocial Security card: show all four corners and the signature on the front.\n\nProof of address: no signature needed — just show your name, current address, and the date (a utility bill or bank statement works).\n\nHighlighter: yellow or blue only. Never pink — it shows as redacted black on TransUnion.\n\nDates: always use separators. 01/15/2025 or January 15th 2025. Never 01152025." },
+  { phase: "Phase 2 · Step 3", color: "#059669", title: "Document Preparation Rules", body: "Photo ID: show the photo and all four corners, legible, no light/dark spots. Never crop corners.\n\nSocial Security card: show all four corners and the signature on the front.\n\nProof of address: no signature needed — show your name and current address, and crop out or cover the date so it is not visible (a utility bill or bank statement works).\n\nHighlighter: yellow or blue only. Never pink — it shows as redacted black on TransUnion.\n\nDates: always use separators. 01/15/2025 or January 15th 2025. Never 01152025." },
   { phase: "Phase 2 · Step 4", color: "#DC2626", title: "Mail & Follow Up", body: "Mail all 3 packets via USPS Certified Mail with Return Receipt the same day. Keep every receipt.\n\nSection 611 gives the bureau 30 days to complete the reinvestigation. If a furnisher cannot verify an item, it must be corrected or deleted.\n\nBureau numbers:\n• Equifax: 404-885-8000 / 888-548-7811\n• Experian: 714-830-7000 / 888-397-3742\n• TransUnion: 610-690-4909 / 800-916-8800 (ask for Special Handling)\n\nBe courteous and persistent. Document date, time, rep name, and rep ID for every call." },
   { phase: "Phase 2 · Step 5", color: "#7C3AED", title: "Escalate to the CFPB if Needed", body: "If a bureau does not properly reinvestigate, file at CFPB.gov → Start New Complaint.\n\nThe company must respond within 15 days (extendable to 60). State that the item is inaccurate and unverified and is harming your credit profile, and ask for correction or deletion.\n\nDon't include your SSN or full account numbers in the complaint. You can submit more than one if needed." },
   { phase: "Phase 3", color: "#0F172A", title: "Build to 800+ Club", body: "Six factors to optimize:\n• Payment history: 100% on time\n• Utilization: 0-3%\n• Derogatory remarks: 0\n• Credit age: 9+ years\n• Total accounts: 21+\n• Inquiries: low\n\nAuthorized-user tradelines (clean, aged, low utilization, reports all 3 bureaus) help credit age, utilization, and account count. Good issuers: Chase, BofA, Capital One, Discover, Elan, Barclays. Avoid Citibank (often 2 bureaus).\n\nMass apply only at 800+: 4-5 cards at a time. 780+ gets the best rates." },
@@ -1098,9 +1099,14 @@ function ClientApp() {
     const first = json.clientName ? json.clientName.split(" ")[0] : "";
     const pending = idTheftStarted && !(affidavitData?.completed && slots.ftcReport);
     const msg = pending
-      ? `Your dispute letters are drafted and in the Package tab${first ? ", " + first : ""}. This isn't ready to mail yet — please finish the identity-theft steps above: upload your FTC report and complete the affidavit. Once both are in, your packets are complete.`
+      ? `Your dispute letters are drafted and in the Package tab${first ? ", " + first : ""}. This isn't ready to mail yet — please finish the identity-theft steps: ${slots.ftcReport ? "" : "upload your FTC report and "}complete the affidavit below. Once ${slots.ftcReport ? "it is" : "both are"} in, your packets are complete.`
       : `Your three packages are ready${first ? ", " + first : ""}. Open the Package tab to review and download each bureau's PDF. Brandon will review before you print and mail.`;
     setMessages(prev => [...prev, { from: "agent", text: msg }]);
+    // Don't let the packet look finished while the affidavit is still open — put the form
+    // right in front of the client as the clear next action.
+    if (pending && !(affidavitData && affidavitData.completed)) {
+      setTimeout(() => surfaceAffidavitForm(null), 600);
+    }
   }
 
   // Show an agent reply, turning any in-chat step tokens into inline cards:
@@ -1141,29 +1147,34 @@ function ClientApp() {
     setBusy(false);
   }
 
-  // Drop the affidavit fill-in form into the chat on demand (always reachable), and ask
-  // the chat to scroll straight to it so the client never has to hunt for it. If a form is
-  // already open we don't push a second one — two live copies would fight over the same
-  // draft — we just scroll to the existing one.
-  function openAffidavitInChat() {
+  // Single place that puts the affidavit form in the chat and scrolls to it. Every entry
+  // point routes through here so the form can never be pushed twice (two live copies would
+  // fight over the same draft) and the chat always lands on it. `intro` is the agent line
+  // shown above a freshly added form; when the form is already present we skip the intro
+  // and just scroll to the existing one.
+  function surfaceAffidavitForm(intro) {
     setTab(0);
     scrollToAffidavit.current = true;
     setMessages(prev => {
       if (prev.some(m => m.from === "affidavit_form")) {
-        // Already open: no message change fires the scroll effect, so do it directly.
         scrollToAffidavit.current = false;
         requestAnimationFrame(() => affidavitFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
         return prev;
       }
-      const editing = !!(affidavitData && affidavitData.completed);
-      return [
-        ...prev,
-        { from: "agent", text: editing
-          ? "Here are the answers you already gave. Change anything you need to and save again — your earlier answers are loaded in for you, so nothing has to be retyped."
-          : "If any items on your report were opened or used by an identity thief, fill out the official FTC affidavit below in your own words. Only complete it if you are genuinely a victim — otherwise you can skip it and we'll dispute on accuracy grounds. You'll sign and notarize it yourself." },
-        { from: "affidavit_form" },
-      ];
+      const add = [];
+      if (intro) add.push({ from: "agent", text: intro });
+      add.push({ from: "affidavit_form" });
+      return [...prev, ...add];
     });
+  }
+
+  // Reopen the affidavit for editing (Package-tab button and the intake toolbar button).
+  // Loads their saved answers back in, scrolls straight to the form.
+  function openAffidavitInChat() {
+    const editing = !!(affidavitData && affidavitData.completed);
+    surfaceAffidavitForm(editing
+      ? "Here are the answers you already gave. Change anything you need to and save again — your earlier answers are loaded in for you, so nothing has to be retyped."
+      : "If any items on your report were opened or used by an identity thief, fill out the official FTC affidavit below in your own words. Only complete it if you are genuinely a victim — otherwise you can skip it and we'll dispute on accuracy grounds. You'll sign and notarize it yourself.");
   }
 
   // Drop the FTC report upload box into the chat on demand.
@@ -1190,7 +1201,14 @@ function ClientApp() {
       copy.splice(idx + 1, 0, { from: "agent", savedNote: true, text: "Saved. Your answers will be printed onto the official FTC affidavit in your packet, ready for you to sign and notarize. The form above stays open — change anything and press save again. You can also reopen it any time from Package → Affidavit." });
       return copy;
     });
-    setTimeout(() => sendProgrammatic("I've completed my identity theft affidavit in the app."), 400);
+    // If the letters were already built and the FTC report is already in, the packet is
+    // now genuinely complete — say so plainly here rather than hoping the model does.
+    if (pkg && slots.ftcReport) {
+      const first = pkg.clientName ? pkg.clientName.split(" ")[0] : "";
+      setMessages(prev => [...prev, { from: "agent", text: `That was the last step${first ? ", " + first : ""}. Your FTC report and affidavit are both in and your three packages are complete in the Package tab. Print, sign, and notarize the affidavit, then Brandon will review before you mail.` }]);
+    } else {
+      setTimeout(() => sendProgrammatic("I've completed my identity theft affidavit in the app."), 400);
+    }
   }
 
   function completeFtcUpload(file) {
@@ -1203,7 +1221,15 @@ function ClientApp() {
       }
       return copy;
     });
-    setTimeout(() => sendProgrammatic("I've uploaded my FTC identity theft report."), 400);
+    // The FTC report and the affidavit are a pair. Once the report is in, the very next
+    // thing the client should see is the affidavit form — the model used to move on to
+    // other document collection and silently drop the affidavit. Surface it here directly
+    // (unless they already completed it), so the step can't be skipped.
+    if (!(affidavitData && affidavitData.completed)) {
+      setTimeout(() => surfaceAffidavitForm("Your FTC report is attached. The last identity-theft step is the affidavit below — fill it out in your own words, only for items you personally know were unauthorized. You'll print, sign, and notarize it yourself. Your dispute letters can be prepared in parallel, but the packet isn't complete to mail until this affidavit is done."), 500);
+    } else {
+      setTimeout(() => sendProgrammatic("I've uploaded my FTC identity theft report."), 400);
+    }
   }
 
   function copyText(text, key) {
