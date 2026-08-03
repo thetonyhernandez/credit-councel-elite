@@ -34,6 +34,23 @@ Your packages dispute items the CLIENT has identified as inaccurate, incomplete,
 If a client tells you they are a genuine victim of identity theft, they complete the Identity Theft Affidavit themselves inside the app (there is a fill-in step for it) and, if they choose, file their own report at IdentityTheft.gov. You never fill the affidavit out for them and never pre-select which items are "fraud." You hand them the blank form and let them complete it in their own words.
 
 ═══════════════════════════════════════════
+ONE ASK PER REPLY — HARD RULE
+═══════════════════════════════════════════
+Every reply asks for exactly ONE thing. Never combine two asks in a single message and never join two asks with "and". "What is your correct legal name, and which of these items do you believe are inaccurate?" is TWO questions and is not allowed. Ask the first, wait for the answer, then ask the next in your following reply.
+
+Before every turn the app gives you an APP-VERIFIED DOCUMENT STATE block. It is the truth about what has actually been uploaded and it OUTRANKS your own memory and anything you said earlier. Ask only for the single item it names under THE ONE THING TO ASK FOR THIS TURN. Never ask for anything it lists as RECEIVED, and never tell the client something is "still needed" when it is listed as RECEIVED.
+
+DOCUMENT ORDER (the app enforces this — follow it):
+1. Credit report  2. Government photo ID  3. Social Security card  4. Proof of current address
+Then the identity-theft question. If the client says yes, the FTC identity theft report comes next and the affidavit comes last — the app opens the upload box and the affidavit form by itself at the right moment. Do NOT jump ahead to the affidavit while documents are still missing, and do NOT let the remaining document list fall off once the identity-theft path opens. If you asked for documents and the client then uploads the FTC report, your next reply still asks for the next missing document.
+
+═══════════════════════════════════════════
+DISPUTE BASIS — THE APP DECIDES THIS, NOT YOU
+═══════════════════════════════════════════
+The app builds every cover letter in code. If the client completes the Identity Theft Affidavit in the app AND has an identity theft report on file, the app writes that letter as a Section 605B (15 U.S.C. 1681c-2) BLOCK request for the items THE CLIENT listed on their own affidavit, and keeps Section 611 for everything else. With no affidavit the letter is a Section 611 reinvestigation request only.
+You never choose the basis and you never write 605B language yourself. Never tell a client who has declared identity theft and completed the affidavit that their letters are an accuracy dispute only — 605B and 611 are different requests and the client will notice.
+
+═══════════════════════════════════════════
 BRANDON METHODOLOGY
 ═══════════════════════════════════════════
 
@@ -48,7 +65,7 @@ When the client uploads the report, YOU read it and pull out everything yourself
 - Negative or questionable accounts: collections, charge-offs, accounts with late/missed/derogatory marks. Capture creditor name exactly as shown, account type, date opened, and which bureau(s) it appears on.
 - Hard inquiries: company name exactly as shown, date, and bureau. Flag inquiries with no matching account in the account history as ones the client may not recognize.
 - Personal information discrepancies: every name variation / "also known as", and every address — note which are old or incorrect.
-After reading, state plainly what you found (e.g. "I found 3 negative accounts and 6 hard inquiries across the three bureaus"), then ask the client to tell you which specific items they believe are inaccurate or do not belong to them. Only the items the client identifies go into the dispute. Do not characterize items as fraud yourself.
+After reading, state plainly what you found (e.g. "I found 3 negative accounts and 6 hard inquiries across the three bureaus"), then ask ONE question: which specific items they believe are inaccurate or do not belong to them. If you also need their correct legal name, that is a separate turn — never bundle it with this question. Only the items the client identifies go into the dispute. Do not characterize items as fraud yourself.
 
 PERSONAL INFO:
 - Less is more: keep current address + legal name + DOB + SSN; request removal of old addresses, employers, phone numbers, and alternate/known-as names.
@@ -59,7 +76,7 @@ IMPORTANT — read identity info from documents, never ask the client to type it
 Read full legal name, current mailing address, date of birth, and SSN directly from the uploaded documents (ID, SSN card, utility bill, credit report). After extracting, show the client what you found and ask only: "Here is what I pulled from your documents — is it all correct?" Never ask the client to type their SSN, DOB, name, or address.
 
 CORRECT NAME — CONFIRM IT:
-The name on the credit report is not always the name the client wants used (for example, after marriage or a name change the report may still show an old last name). Whenever the report's name differs from the ID, OR whenever a personal-information correction is being made, you must ask the client to confirm the exact correct legal name to use going forward — for example: "Your report shows [name on report], but I want to use your correct legal name on everything. What is the exact full name you want used?" Use the name the client gives you on ALL letters and on the affidavit. The personal-information correction letter states only the correct name (the one to update to) — do not write an old-name-to-new-name format, just the correct name. Store the confirmed name as clientName in your state and never revert to the report's version.
+The name on the credit report is not always the name the client wants used (for example, after marriage or a name change the report may still show an old last name). Whenever the report's name differs from the ID, OR whenever a personal-information correction is being made, you must ask the client to confirm the exact correct legal name to use going forward, as a question ON ITS OWN and never bundled with another ask — for example: "Your report shows [name on report], but I want to use your correct legal name on everything. What is the exact full name you want used?" Use the name the client gives you on ALL letters and on the affidavit. The personal-information correction letter states only the correct name (the one to update to) — do not write an old-name-to-new-name format, just the correct name. Store the confirmed name as clientName in your state and never revert to the report's version.
 
 DOCUMENT PREP RULES:
 - Photo ID: show the photo and all four corners, legible, no glare/dark spots — bureaus reject cropped corners.
@@ -71,7 +88,7 @@ DOCUMENT PREP RULES:
 
 MAILING & FOLLOW-UP:
 - One packet per bureau. Mail USPS Certified Mail with Return Receipt; keep tracking.
-- Follow up with the bureau's reinvestigation result; Section 611 requires completion within 30 days.
+- Follow up with the bureau's result. A Section 611 reinvestigation must be completed within 30 days. A Section 605B block must be applied within 4 business days of the bureau receiving proof of identity, the identity theft report, the identification of the information, and the client's statement that it is not theirs.
 - Bureau phone numbers: Equifax 404-885-8000 / 888-548-7811; Experian 714-830-7000 / 888-397-3742; TransUnion 610-690-4909 / 800-916-8800 (ask for Special Handling).
 - Be persistent and courteous. Document date, time, rep name, rep ID for every call.
 - If a furnisher cannot verify an item, it must be corrected or deleted.
@@ -96,7 +113,7 @@ The app builds ONE combined PDF per bureau automatically from the PACKAGE_READY 
 
 PACKET ORDER (the app assembles this):
 1. Blank page for the handwritten cover letter
-2. Typed cover letter (Section 611 reinvestigation request)
+2. Typed cover letter (Section 605B block request for affidavit items when applicable, plus Section 611 reinvestigation)
 3. Personal Information Correction Letter (only if needed)
 4. Personal identification page (ID + SSN card + proof of address)
 5. Credit report pages
@@ -148,9 +165,9 @@ Do NOT fill out the Identity Theft Affidavit and do NOT decide which items go on
 WHEN TO ASK (sequence): Once the client has provided the credit report, photo ID, Social Security card, and proof of address, and you have identified and listed the negative items and the client has confirmed your list, then — before building the package — ask one plain question: "Were any of these items opened or used without your authorization — that is, identity theft? If so, I'll have you complete the FTC affidavit right here. If not, we'll dispute them as inaccurate." Do not build the package in the same turn as this question.
 IN-CHAT IDENTITY-THEFT STEPS: When the client answers that one or more items WERE identity theft, in your next reply:
 - Briefly tell them to file their own report at IdentityTheft.gov, then output the token FTC_REPORT_STEP on its own line (an upload box for the report they create).
-- Then guide them to complete the official FTC affidavit and output the token AFFIDAVIT_STEP on its own line. The fill-in form opens in the chat for THEM to type their own answers, which print onto the official FTC form to sign and notarize.
-IDENTITY-THEFT PATH IS STICKY: Once the client has said an item was identity theft, both the FTC report AND the affidavit are required parts of their packet. If you still need other documents (photo ID, SSN card, proof of address), collect them, but you must NOT let the affidavit fall off. After the FTC report is uploaded, the app shows the affidavit form automatically — do not tell the client the intake is finished, do not ask "shall I build the packages," and do not output PACKAGE_READY as if everything is done while the affidavit is still outstanding. The letters may be built in parallel, but every reply while the affidavit is incomplete must state plainly that the packet is not complete to mail until the client completes the affidavit. Never imply the case is ready when the affidavit is still open.
-HOW TO GUIDE THE FORM (do this when you show AFFIDAVIT_STEP): explain how to complete it, not what to claim. Tell them: enter your legal name, date of birth, SSN, driver's license, and current address; answer whether your name, address or phone has changed since the fraud, and if it has, enter what they were then; for the three declarations, check only what is true for you; the form asks whether you know who used your information — answer no and skip it if you don't, and enter only what you actually know if you do; the description of how the theft happened should match the personal statement in your own FTC report; in the accounts section, list ONLY the specific items you personally know were opened or used without your authorization — in your own words; then print, sign, and have it notarized. You may explain what each field means. You must NOT tell the client which accounts to list, must NOT suggest that any identified negative is fraud, and must NOT characterize items as identity theft on their behalf. The choice of which items to include is entirely theirs.
+- The affidavit form is opened by the app itself, once the four required documents AND the FTC report are in. Output the token AFFIDAVIT_STEP only when the app state names the affidavit as the one thing to ask for this turn.
+IDENTITY-THEFT PATH IS STICKY: Once the client has said an item was identity theft, both the FTC report AND the affidavit are required parts of their packet. If you still need other documents (photo ID, SSN card, proof of address), keep collecting them ONE AT A TIME — the affidavit does not replace them and must not push them off the list. After the FTC report is uploaded, the app returns to any outstanding documents and then shows the affidavit form automatically — do not tell the client the intake is finished, do not ask "shall I build the packages," and do not output PACKAGE_READY as if everything is done while the affidavit is still outstanding. The letters may be built in parallel, but every reply while the affidavit is incomplete must state plainly that the packet is not complete to mail until the client completes the affidavit. Never imply the case is ready when the affidavit is still open.
+HOW TO GUIDE THE FORM (do this when the app opens the affidavit): explain how to complete it, not what to claim. Tell them: enter your legal name, date of birth, SSN, driver's license, and current address; answer whether your name, address or phone has changed since the fraud, and if it has, enter what they were then; for the three declarations, check only what is true for you; the form asks whether you know who used your information — answer no and skip it if you don't, and enter only what you actually know if you do; the description of how the theft happened should match the personal statement in your own FTC report; in the accounts section, list ONLY the specific items you personally know were opened or used without your authorization — in your own words; then print, sign, and have it notarized. You may explain what each field means. You must NOT tell the client which accounts to list, must NOT suggest that any identified negative is fraud, and must NOT characterize items as identity theft on their behalf. The choice of which items to include is entirely theirs.
 Output each token at most once. If the client says none were identity theft (only inaccurate or not theirs), do NOT output the tokens — proceed to build and dispute on accuracy grounds under Section 611.
 
 THE FTC REPORT:
@@ -186,7 +203,7 @@ MEMORY PROTOCOL — CRITICAL (this is what stops re-asking)
 ═══════════════════════════════════════════
 You are STATELESS between turns. The running state object is your only memory.
 
-1. Before every turn you receive a "CONFIRMED CLIENT STATE" block. TREAT IT AS ABSOLUTE TRUTH. Any filled field is DONE — never ask for it again, never re-summarize a document you already read. Only ask for fields that are still null/empty.
+1. Before every turn you receive an "APP-VERIFIED DOCUMENT STATE" block and a "CONFIRMED CLIENT STATE" block. TREAT THEM AS ABSOLUTE TRUTH, and where they disagree about documents the APP-VERIFIED block wins. Any filled field is DONE — never ask for it again, never re-summarize a document you already read. Only ask for fields that are still null/empty.
 
 2. At the very END of EVERY reply (after your message, and after any PACKAGE_READY block), output your updated memory EXACTLY like this with nothing after it:
 ###STATE###
@@ -203,11 +220,11 @@ CONVERSATION RULES:
 - TONE: precise, clear, professional. Short plain sentences. No emojis, no hype.
 - NO MARKDOWN. No asterisks, bold, or headings — they render literally. Plain sentences; if you must list, use a simple hyphen.
 - Keep replies brief: one line confirming what you received, then the single next step.
-- Use the client's first name once known. Ask ONE thing at a time.
+- Use the client's first name once known. Ask ONE thing at a time — never two.
 - NEVER say you cannot generate a PDF and never give manual PDF steps. To finish, OUTPUT THE PACKAGE_READY BLOCK.
 - NEVER ask the client to type their SSN, DOB, name, or address — read these from documents.
 - Never re-ask for info already provided or extracted.
-- Disputes are made on accuracy grounds under Section 611 for items the client identifies. Do not assert identity theft on the client's behalf; the affidavit and any FTC report are the client's own to complete.`;
+- Do not assert identity theft on the client's behalf; the affidavit and any FTC report are the client's own to complete, and the app derives the 605B items solely from what the client typed on their own affidavit.`;
 
 const BUREAUS = [
   { key: "equifax",     label: "Equifax",     color: "#B91C1C" },
@@ -233,6 +250,189 @@ const PACKET_SLOTS = [
   { key: "ftcReport",      label: "FTC Identity Theft Report (you create it at IdentityTheft.gov, then upload it here)" },
   { key: "policeReport",   label: "Police Report (optional)" },
 ];
+
+// The four documents every packet needs, in the order they are collected. The APP owns
+// this order. The model kept inventing its own, asking for two things at once, and
+// dropping the remaining documents the moment the identity-theft path opened.
+export const REQUIRED_DOCS = [
+  { key: "creditReport",   label: "credit report (MyFreeScoreNow)" },
+  { key: "photoID",        label: "government photo ID", alt: "passport" },
+  { key: "ssnCard",        label: "Social Security card" },
+  { key: "proofResidence", label: "proof of current address" },
+];
+
+// One deterministic sentence per document, so the single next step is always asked in
+// Brandon's words with no round trip to the model to get it wrong.
+const DOC_ASK = {
+  creditReport:   "Next I need your credit report from MyFreeScoreNow. Log in, open 3B Reports, switch to Classic View, then save it as a PDF and upload it here.",
+  photoID:        "Next I need your government photo ID. Show the photo and all four corners, no glare and no dark spots — bureaus reject IDs with cropped corners.",
+  ssnCard:        "Next I need your Social Security card. It has to show all four corners and the signature on the front.",
+  proofResidence: "Next I need your proof of current address — a utility bill or bank statement showing your name and current address. Crop out or cover the date so it is not visible. No signature needed.",
+};
+
+export function hasDoc(slots, d) {
+  if (!slots || !d) return false;
+  if (slots[d.key]) return true;
+  if (d.alt && slots[d.alt]) return true;
+  return false;
+}
+
+export function missingRequired(slots) {
+  return REQUIRED_DOCS.filter(d => !hasDoc(slots, d));
+}
+
+// Normalise a creditor/institution name so "CAPITAL ONE BANK USA" and "Capital One"
+// compare equal. Corporate filler words are dropped, not the distinguishing words.
+export function normKey(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\b(bank|na|usa|inc|llc|co|corp|company|the|of|services|service|financial|card|cards)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// The ONLY source of identity-theft items is what the CLIENT typed on their own
+// affidavit — section (19) institutions and section (18) inquiry companies. Nothing here
+// is inferred from the credit report and nothing is chosen for them.
+export function affidavitTheftNames(aff) {
+  if (!aff || !aff.completed) return [];
+  const out = [];
+  (aff.accounts || []).forEach(a => { if (a && a.institution && String(a.institution).trim()) out.push(String(a.institution).trim()); });
+  [aff.company18A, aff.company18B, aff.company18C].forEach(c => { if (c && String(c).trim()) out.push(String(c).trim()); });
+  return out;
+}
+
+export function matchesTheft(item, names) {
+  const it = normKey(item);
+  if (!it) return false;
+  // Bureaus abbreviate the same furnisher differently — Jennifer's report showed the same
+  // Capital One inquiry as "CAPITAL ONE BANK USA", "CAP ONE NA" and "CAPITAL ONE" across
+  // the three bureaus. A token matches if it is equal to, or a prefix of, the other.
+  const tokenEq = (x, y) => x === y || (x.length >= 3 && y.startsWith(x)) || (y.length >= 3 && x.startsWith(y));
+  return (names || []).some(n => {
+    const k = normKey(n);
+    if (k.length < 3) return false;
+    if (it.includes(k) || k.includes(it)) return true;
+    const a = it.split(" ").filter(w => w.length > 2);
+    const b = k.split(" ").filter(w => w.length > 2);
+    if (!a.length || !b.length) return false;
+    const shared = b.filter(w => a.some(x => tokenEq(x, w)));
+    return shared.length >= Math.min(2, b.length);
+  });
+}
+
+// Split one bureau's disputed items into a 605B block list and a 611 accuracy list.
+// 605B only applies when the client completed the affidavit AND an identity theft report
+// is on file — those are two of the four things Section 605B(a) requires. Otherwise every
+// item stays on accuracy grounds and the letter is unchanged from before.
+export function splitDisputeItems(pkg, aff, slots, bureauKey) {
+  const items = ((pkg && pkg.disputeItems && pkg.disputeItems[bureauKey]) || []).slice();
+  const hasReport = !!(slots && (slots.ftcReport || slots.policeReport));
+  const names = affidavitTheftNames(aff);
+  if (!names.length || !hasReport) return { block: [], accuracy: items };
+  const block = [], accuracy = [];
+  items.forEach(it => (matchesTheft(it, names) ? block : accuracy).push(it));
+  // Anything the client swore to on their own affidavit that the model never listed for
+  // ANY bureau is still theirs to block — carry it across in their own words.
+  const allItems = [];
+  ["equifax", "experian", "transunion"].forEach(k => {
+    (((pkg && pkg.disputeItems) || {})[k] || []).forEach(i => allItems.push(i));
+  });
+  names.forEach(n => {
+    if (!allItems.some(i => matchesTheft(i, [n]))) {
+      const up = String(n).toUpperCase();
+      if (!block.some(b => normKey(b) === normKey(up))) block.push(up);
+    }
+  });
+  return { block, accuracy };
+}
+
+// The cover letter, built deterministically in code so the bureau's name/address is
+// always correct and the client's confirmed legal name is always used.
+//
+// TWO TRACKS, and the client's own affidavit decides which items go where:
+//   605B block  — items the CLIENT listed on their own sworn affidavit, when an identity
+//                 theft report is also on file. Cites 15 U.S.C. 1681c-2, 4 business days,
+//                 and the furnisher notice in 605B(b).
+//   611 accuracy — everything else, exactly as before.
+// With no affidavit the letter is byte-for-byte the old Section 611 letter.
+export function buildCoverLetterTextPure(pkg, aff, slots, bureauKey) {
+  const today = new Date().toLocaleDateString("en-US");
+  const ssn = pkg && pkg.ssn4 ? pkg.ssn4 : "";
+  const addr = (BUREAU_ADDR[bureauKey] || "").replace(/,\s*(P\.?\s*O\.?\s*Box)/i, ",\n$1");
+  const { block, accuracy } = splitDisputeItems(pkg, aff, slots, bureauKey);
+  const theft = block.length > 0;
+  const name = (pkg && pkg.clientName) || "";
+  const cAddr = (pkg && pkg.clientAddress) || "";
+  const lines = [name, cAddr, ``, addr, ``, `Date: ${today}`, ``];
+
+  lines.push(theft
+    ? `RE: Request to Block Information Resulting from Identity Theft under FCRA Section 605B, and Request for Reinvestigation under Section 611; SSN ending ${ssn}`
+    : `RE: Request for Reinvestigation of Inaccurate Information; SSN ending ${ssn}`);
+  lines.push(``, `To Whom It May Concern,`, ``);
+
+  if (theft) {
+    lines.push(`I am a victim of identity theft. Under the Fair Credit Reporting Act Section 605B (15 U.S.C. 1681c-2), I request that you block the following information from my credit file within 4 business days. Enclosed are proof of my identity, a copy of my identity theft report, and my completed Identity Theft Victim's Complaint and Affidavit identifying this information.`);
+    lines.push(``, `Information to be blocked as a result of identity theft:`);
+    block.forEach((it, i) => lines.push(`${i + 1}. ${it}`));
+    lines.push(``);
+    lines.push(`As stated in my enclosed affidavit, the information listed above does not relate to any transaction by me. Please also notify each furnisher of this information that it may be the result of identity theft, that an identity theft report has been filed, that a block has been requested, and of the effective dates of the block, as required by Section 605B(b).`);
+    lines.push(``);
+    if (accuracy.length) {
+      lines.push(`Separately, I dispute the following items as inaccurate, incomplete, or not belonging to me. Under Section 611 (15 U.S.C. 1681i), please reinvestigate each item with the furnisher and correct or delete any that cannot be verified as accurate.`);
+      lines.push(``, `Items disputed for accuracy:`);
+      accuracy.forEach((it, i) => lines.push(`${i + 1}. ${it}`));
+      lines.push(``);
+      lines.push(`If an item above cannot be verified, please delete it and provide me with an updated copy of my credit report. Please complete this reinvestigation within 30 days as required by Section 611.`);
+      lines.push(``);
+    }
+    lines.push(`Enclosed: my identity theft report, my Identity Theft Victim's Complaint and Affidavit, government photo identification, Social Security card, proof of current address, and the relevant pages of my credit report.`);
+    lines.push(``);
+  } else {
+    lines.push(`I have reviewed my credit report and am disputing the following items, which I have identified as inaccurate, incomplete, or not belonging to me. Under the Fair Credit Reporting Act Section 611 (15 U.S.C. 1681i), I request that you reinvestigate each item with the furnisher and correct or delete any that cannot be verified as accurate.`);
+    lines.push(``, `Items disputed:`);
+    if (accuracy.length) accuracy.forEach((it, i) => lines.push(`${i + 1}. ${it}`));
+    else lines.push(`(see the enclosed credit report)`);
+    lines.push(``);
+    lines.push(`For each item above, please confirm its accuracy directly with the furnisher. If an item cannot be verified, please delete it and provide me with an updated copy of my credit report. Please complete this reinvestigation within 30 days as required by Section 611.`);
+    lines.push(``);
+  }
+
+  lines.push(`My contact information is as follows:`);
+  lines.push(name);
+  lines.push(cAddr);
+  return lines.join("\n");
+}
+
+export function buildPersonalInfoTextPure(pkg, bureauKey) {
+  const b = BUREAUS.find(x => x.key === bureauKey);
+  const today = new Date().toLocaleDateString("en-US");
+  const ssn = pkg && pkg.ssn4 ? "XXX-XX-" + pkg.ssn4 : "";
+  return [
+    `Date ${today}`,
+    `Credit Bureau Name: ${b ? b.label : ""}`,
+    `Credit Bureau Address: ${BUREAU_ADDR[bureauKey] || ""}`,
+    ``,
+    `To Whom It May Concern:`,
+    ``,
+    `I am writing to update/correct my personal information on file with your company.`,
+    ``,
+    `Please update my address to: ${(pkg && pkg.clientAddress) || ""}`,
+    `Please update my name to: ${(pkg && pkg.clientName) || ""}`,
+    `My only social security number is: ${ssn}`,
+    `My only and correct date of birth is: ${(pkg && pkg.dob) || ""}`,
+    ``,
+    `I do not wish to have any telephone numbers on my report.`,
+    ``,
+    `Please remove all the other addresses off my report, as they are not deliverable to me by the U.S. post office, and they are not reportable as per the FCRA, since they are inaccurate.`,
+    ``,
+    `Sincerely,`,
+    `${(pkg && pkg.clientName) || ""}`,
+    ``,
+    `Enc. Driver License, Passport, SSN Card, and Proof of Residence`,
+  ].join("\n");
+}
 
 // Standard FCRA 605B law page — auto-added to every packet, identical each time.
 const FCRA_605B_TEXT = `FCRA § 605B (15 U.S.C. § 1681c-2)
@@ -272,7 +472,7 @@ const GUIDE = [
 // The affidavit prints the street on one line and City / State / ZIP / Country on the
 // line below it. Anything we already hold is one combined string, so split it before it
 // is offered back to the client — never print a whole address onto the street line.
-function splitAddress(full) {
+export function splitAddress(full) {
   const s = String(full || "").replace(/\s+/g, " ").trim();
   const out = { street: "", city: "", state: "", zip: "" };
   if (!s) return out;
@@ -580,6 +780,31 @@ function ClientApp() {
   const [dragActive,  setDragActive]  = useState(false);
   // Client-completed affidavit (blank until the client fills it in themselves).
   const [affidavitData, setAffidavitData] = useState(null);
+  // Synchronous mirrors of the three things the model must never be wrong about. State
+  // updates land a render later, and the API call that carries "what do we still need"
+  // often goes out in the same tick as an upload — that lag is exactly why the agent kept
+  // re-asking for a document the client had just attached.
+  const slotsRef     = useRef({});
+  const affidavitRef = useRef(null);
+  const idTheftRef   = useRef(false);
+
+  // Every slot write goes through here so the ref and the state can never disagree.
+  function updateSlots(fn) {
+    const next = fn(slotsRef.current || {});
+    slotsRef.current = next;
+    setSlots(next);
+    return next;
+  }
+
+  function markIdTheft() {
+    idTheftRef.current = true;
+    setIdTheftStarted(true);
+  }
+
+  function setAffidavit(next) {
+    affidavitRef.current = next;
+    setAffidavitData(next);
+  }
   // Live, unsaved affidavit answers. Held in a ref on purpose: the form reports every
   // keystroke, and putting that in state would re-render the entire chat per character.
   const affidavitDraftRef = useRef(null);
@@ -627,10 +852,10 @@ function ClientApp() {
         .from("packages")
         .insert([{
           client_id: cid,
-          equifax: data.equifax || null,
-          experian: data.experian || null,
-          transunion: data.transunion || null,
-          personal_info: data.personalInfoNeeded ? buildPersonalInfoText("equifax") : null,
+          equifax: buildCoverLetterText("equifax", data) || data.equifax || null,
+          experian: buildCoverLetterText("experian", data) || data.experian || null,
+          transunion: buildCoverLetterText("transunion", data) || data.transunion || null,
+          personal_info: data.personalInfoNeeded ? buildPersonalInfoText("equifax", data) : null,
           checklist: data.checklist || null,
           packet_order: data.packetOrder || null,
           dispute_items: data.disputeItems || null,
@@ -700,14 +925,15 @@ function ClientApp() {
           setHistory(Array.isArray(s.history) ? s.history : []);
           if (s.profile) { profileRef.current = s.profile; setProfile(s.profile); }
           if (s.pkg) setPkg(s.pkg);
-          if (s.slots) setSlots(s.slots);
+          if (s.slots) { slotsRef.current = s.slots; setSlots(s.slots); }
           if (Array.isArray(s.docFiles)) setDocFiles(s.docFiles);
           if (Array.isArray(s.uploads)) setUploads(s.uploads);
           if (typeof s.progress === "number") setProgress(s.progress);
           if (s.statusTxt) setStatusTxt(s.statusTxt);
           if (s.approved) setApproved(true);
           if (s.clientId) setClientId(s.clientId);
-          if (s.affidavitData) setAffidavitData(s.affidavitData);          if (s.idTheftStarted) setIdTheftStarted(true);
+          if (s.affidavitData) { affidavitRef.current = s.affidavitData; setAffidavitData(s.affidavitData); }
+          if (s.idTheftStarted) { idTheftRef.current = true; setIdTheftStarted(true); }
           if (s.announcedReady) setAnnouncedReady(true);
           didRestore = true;
         }
@@ -778,9 +1004,10 @@ function ClientApp() {
     setMessages([]); setHistory([]); setPkg(null); setSlots({}); setDocFiles([]);
     setUploads([]); setProgress(0); setStatusTxt("Ready to begin"); setApproved(false);
     setClientId(null); setProfile(null); profileRef.current = null; setDocTab("equifax"); setTab(0);
-    setAffidavitData(null); setShowAffidavit(false);
+    setAffidavitData(null); affidavitRef.current = null; setShowAffidavit(false);
+    slotsRef.current = {};
     clearAffidavitDraft();
-    setIdTheftStarted(false); setAnnouncedReady(false);
+    setIdTheftStarted(false); idTheftRef.current = false; setAnnouncedReady(false);
     initAgent();
   }
 
@@ -802,12 +1029,46 @@ function ClientApp() {
     setProfile(merged);
   }
 
+  // What the app KNOWS is on file, computed from the slots the client actually filled.
+  // This outranks the model's own memory. It is what stops "I still need your FTC report"
+  // one message after the client attached their FTC report.
+  function buildAppState() {
+    const s = slotsRef.current || {};
+    const have = [];
+    REQUIRED_DOCS.forEach(d => { if (hasDoc(s, d)) have.push(d.label); });
+    if (s.ftcReport) have.push("FTC identity theft report");
+    if (s.policeReport) have.push("police report");
+    const aff = affidavitRef.current;
+    const affDone = !!(aff && aff.completed);
+    if (affDone) have.push("Identity Theft Affidavit (completed in the app)");
+    const miss = missingRequired(s).map(d => d.label);
+    const theft = !!idTheftRef.current;
+    let next;
+    if (miss.length) next = miss[0];
+    else if (theft && !s.ftcReport) next = "the FTC identity theft report (the app shows the upload box itself)";
+    else if (theft && !affDone) next = "the affidavit (the app opens the form itself — never ask the client to type it into the chat)";
+    else next = "nothing is outstanding — ask your single next intake question, or output PACKAGE_READY if you have the disputed items";
+    return [
+      "═══════════════════════════════════════════",
+      "APP-VERIFIED DOCUMENT STATE (authoritative — outranks your memory)",
+      "═══════════════════════════════════════════",
+      "RECEIVED (never ask for these again): " + (have.length ? have.join(", ") : "nothing yet"),
+      "STILL MISSING: " + (miss.length ? miss.join(", ") : "none of the four required documents"),
+      "IDENTITY THEFT PATH: " + (theft ? "ACTIVE" : "not indicated by the client"),
+      "AFFIDAVIT: " + (affDone ? "COMPLETE" : theft ? "PENDING" : "not required"),
+      "THE ONE THING TO ASK FOR THIS TURN: " + next,
+      "Ask for that one thing and nothing else. Do not add a second question. Do not ask for anything listed under RECEIVED.",
+    ].join("\n");
+  }
+
   // SYSTEM prompt + the authoritative "already collected" block, injected every call.
   function buildSystem() {
-    if (!profileRef.current) return SYSTEM;
-    return SYSTEM +
-      "\n\n═══════════════════════════════════════════\nCONFIRMED CLIENT STATE (authoritative — do NOT re-ask any filled field)\n═══════════════════════════════════════════\n" +
-      JSON.stringify(profileRef.current, null, 2);
+    let out = SYSTEM + "\n\n" + buildAppState();
+    if (profileRef.current) {
+      out += "\n\n═══════════════════════════════════════════\nCONFIRMED CLIENT STATE (authoritative — do NOT re-ask any filled field)\n═══════════════════════════════════════════\n" +
+        JSON.stringify(profileRef.current, null, 2);
+    }
+    return out;
   }
 
   // Replace heavy base64 blocks with a light placeholder so a raw file is sent once.
@@ -1003,7 +1264,7 @@ function ClientApp() {
 
     const docs = fileData.filter(f => f.type.startsWith("image/") || f.type === "application/pdf");
     setDocFiles(prev => [...prev, ...docs.map(f => ({ name: f.name, type: f.type, dataUrl: f.data }))]);
-    setSlots(prev => {
+    updateSlots(prev => {
       const next = { ...prev };
       for (const f of docs) {
         const cat = inferSlot(f.name);
@@ -1071,6 +1332,7 @@ function ClientApp() {
         pushAgentReply(clean);
         setProgress(prev => Math.min(80, prev + 15));
         setStatusTxt("Documents read — continuing intake");
+        setTimeout(() => maybeSurfacePending(), 600);
       }
     } catch (e) {
       setHistory(lightenAll(history));
@@ -1120,7 +1382,7 @@ function ClientApp() {
     if (text) add.push({ from: "agent", text });
     if (wantsFtc) add.push({ from: "ftc_upload" });
     if (wantsAff) add.push({ from: "affidavit_form" });
-    if (wantsFtc || wantsAff) setIdTheftStarted(true);
+    if (wantsFtc || wantsAff) markIdTheft();
     if (add.length) setMessages(prev => [...prev, ...add]);
   }
 
@@ -1145,6 +1407,65 @@ function ClientApp() {
       setMessages(prev => [...prev, { from: "agent", text: "Error: " + e.message }]);
     }
     setBusy(false);
+  }
+
+  // Say something as the agent WITHOUT a model round trip, and record it in the history
+  // so the model's next turn knows it was said. Used for the deterministic next-step
+  // prompts, where the model had been improvising and getting the order wrong.
+  function pushAgentText(text) {
+    if (!text) return;
+    setMessages(prev => [...prev, { from: "agent", text }]);
+    setHistory(prev => [...prev, { role: "assistant", content: text }]);
+  }
+
+  // THE sequencer. After any step completes, the app — not the model — decides the single
+  // next thing and asks for it. Order is fixed: the four required documents, then the FTC
+  // report, then the affidavit. This is what stops the affidavit jumping ahead of the ID
+  // documents and stops the document list falling off once identity theft is raised.
+  function advanceIntake(prefix) {
+    const s = slotsRef.current || {};
+    const miss = missingRequired(s);
+    const aff = affidavitRef.current;
+    const affDone = !!(aff && aff.completed);
+    const theft = !!idTheftRef.current;
+    const lead = prefix ? prefix + "\n\n" : "";
+
+    if (miss.length) {
+      const tail = theft && !affDone
+        ? "\n\nYour packet is not complete to mail until the affidavit is done — I'll bring that back once your documents are in."
+        : "";
+      pushAgentText(lead + DOC_ASK[miss[0].key] + tail);
+      return;
+    }
+    if (theft && !s.ftcReport) {
+      pushAgentText(lead + "All four of your documents are in. The next step is your own FTC identity theft report — file it at IdentityTheft.gov, then upload the PDF here.");
+      setMessages(prev => prev.some(m => m.from === "ftc_upload") ? prev : [...prev, { from: "ftc_upload" }]);
+      return;
+    }
+    if (theft && !affDone) {
+      surfaceAffidavitForm(lead + "Everything else is in. The last step is the affidavit below. Fill it out in your own words and list only the items you personally know were opened or used without your authorization. You will print, sign, and notarize it yourself.");
+      return;
+    }
+    const prof = profileRef.current || {};
+    const di = prof.disputeItems || {};
+    const chose = ["equifax", "experian", "transunion"].some(k => (di[k] || []).length > 0);
+    if (chose && !pkg) { if (lead) pushAgentText(lead.trim()); setTimeout(() => generatePackages(), 300); return; }
+    if (lead) pushAgentText(lead.trim());
+    setTimeout(() => sendProgrammatic("That is everything on my end — all of my documents are uploaded."), 400);
+  }
+
+  // Safety net after an upload turn: if the identity-theft steps are now unblocked and the
+  // model didn't surface them, the app does. Never duplicates a card already on screen.
+  function maybeSurfacePending() {
+    if (!idTheftRef.current) return;
+    const s = slotsRef.current || {};
+    if (missingRequired(s).length) return;
+    if (!s.ftcReport) {
+      setMessages(prev => prev.some(m => m.from === "ftc_upload") ? prev : [...prev, { from: "ftc_upload" }]);
+      return;
+    }
+    const aff = affidavitRef.current;
+    if (!(aff && aff.completed)) surfaceAffidavitForm(null);
   }
 
   // Single place that puts the affidavit form in the chat and scrolls to it. Every entry
@@ -1191,7 +1512,7 @@ function ClientApp() {
   // itself stays on screen so they can immediately correct a typo they just spotted —
   // replacing it with a text bubble is what made the last round of edits feel destructive.
   function completeAffidavit(ans) {
-    setAffidavitData({ ...ans, completed: true });
+    setAffidavit({ ...ans, completed: true });
     clearAffidavitDraft();
     setMessages(prev => {
       if (prev.some(m => m.savedNote)) return prev;
@@ -1201,13 +1522,15 @@ function ClientApp() {
       copy.splice(idx + 1, 0, { from: "agent", savedNote: true, text: "Saved. Your answers will be printed onto the official FTC affidavit in your packet, ready for you to sign and notarize. The form above stays open — change anything and press save again. You can also reopen it any time from Package → Affidavit." });
       return copy;
     });
-    // If the letters were already built and the FTC report is already in, the packet is
-    // now genuinely complete — say so plainly here rather than hoping the model does.
-    if (pkg && slots.ftcReport) {
+    // What comes next is decided by the app, not the model: if documents are still
+    // outstanding it asks for the next one, and only when everything is in does it call
+    // the packet complete.
+    const done = !missingRequired(slotsRef.current || {}).length && !!(slotsRef.current || {}).ftcReport;
+    if (pkg && done) {
       const first = pkg.clientName ? pkg.clientName.split(" ")[0] : "";
       setMessages(prev => [...prev, { from: "agent", text: `That was the last step${first ? ", " + first : ""}. Your FTC report and affidavit are both in and your three packages are complete in the Package tab. Print, sign, and notarize the affidavit, then Brandon will review before you mail.` }]);
     } else {
-      setTimeout(() => sendProgrammatic("I've completed my identity theft affidavit in the app."), 400);
+      setTimeout(() => advanceIntake("Your affidavit is saved."), 450);
     }
   }
 
@@ -1221,15 +1544,12 @@ function ClientApp() {
       }
       return copy;
     });
-    // The FTC report and the affidavit are a pair. Once the report is in, the very next
-    // thing the client should see is the affidavit form — the model used to move on to
-    // other document collection and silently drop the affidavit. Surface it here directly
-    // (unless they already completed it), so the step can't be skipped.
-    if (!(affidavitData && affidavitData.completed)) {
-      setTimeout(() => surfaceAffidavitForm("Your FTC report is attached. The last identity-theft step is the affidavit below — fill it out in your own words, only for items you personally know were unauthorized. You'll print, sign, and notarize it yourself. Your dispute letters can be prepared in parallel, but the packet isn't complete to mail until this affidavit is done."), 500);
-    } else {
-      setTimeout(() => sendProgrammatic("I've uploaded my FTC identity theft report."), 400);
-    }
+    markIdTheft();
+    // The FTC report never ends the queue. If ID documents are still outstanding the
+    // sequencer asks for the next one and brings the affidavit back afterwards; only when
+    // everything else is in does the affidavit form open. Previously this jumped straight
+    // to the affidavit and the outstanding document list was silently dropped.
+    setTimeout(() => advanceIntake(`Got it — your FTC report is attached.`), 450);
   }
 
   function copyText(text, key) {
@@ -1305,65 +1625,12 @@ function ClientApp() {
   // name/address is always correct and distinct, and the client's confirmed legal name
   // is always used. Only the disputed-item list varies per bureau (from the client's
   // selection). The model no longer controls the address or name.
-  function buildCoverLetterText(bureauKey) {
-    const today = new Date().toLocaleDateString("en-US");
-    const ssn = pkg && pkg.ssn4 ? pkg.ssn4 : "";
-    const addr = (BUREAU_ADDR[bureauKey] || "").replace(/,\s*(P\.?\s*O\.?\s*Box)/i, ",\n$1");
-    const items = (pkg && pkg.disputeItems && pkg.disputeItems[bureauKey]) || [];
-    const lines = [
-      `${(pkg && pkg.clientName) || ""}`,
-      `${(pkg && pkg.clientAddress) || ""}`,
-      ``,
-      addr,
-      ``,
-      `Date: ${today}`,
-      ``,
-      `RE: Request for Reinvestigation of Inaccurate Information; SSN ending ${ssn}`,
-      ``,
-      `To Whom It May Concern,`,
-      ``,
-      `I have reviewed my credit report and am disputing the following items, which I have identified as inaccurate, incomplete, or not belonging to me. Under the Fair Credit Reporting Act Section 611 (15 U.S.C. 1681i), I request that you reinvestigate each item with the furnisher and correct or delete any that cannot be verified as accurate.`,
-      ``,
-      `Items disputed:`,
-    ];
-    if (items.length) items.forEach((it, i) => lines.push(`${i + 1}. ${it}`));
-    else lines.push(`(see the enclosed credit report)`);
-    lines.push(``);
-    lines.push(`For each item above, please confirm its accuracy directly with the furnisher. If an item cannot be verified, please delete it and provide me with an updated copy of my credit report. Please complete this reinvestigation within 30 days as required by Section 611.`);
-    lines.push(``);
-    lines.push(`My contact information is as follows:`);
-    lines.push(`${(pkg && pkg.clientName) || ""}`);
-    lines.push(`${(pkg && pkg.clientAddress) || ""}`);
-    return lines.join("\n");
+  function buildCoverLetterText(bureauKey, p = pkg, a = affidavitRef.current, sl = slotsRef.current) {
+    return buildCoverLetterTextPure(p, a, sl, bureauKey);
   }
 
-  function buildPersonalInfoText(bureauKey) {
-    const b = BUREAUS.find(x => x.key === bureauKey);
-    const today = new Date().toLocaleDateString("en-US");
-    const ssn = pkg && pkg.ssn4 ? "XXX-XX-" + pkg.ssn4 : "";
-    return [
-      `Date ${today}`,
-      `Credit Bureau Name: ${b.label}`,
-      `Credit Bureau Address: ${BUREAU_ADDR[bureauKey]}`,
-      ``,
-      `To Whom It May Concern:`,
-      ``,
-      `I am writing to update/correct my personal information on file with your company.`,
-      ``,
-      `Please update my address to: ${(pkg && pkg.clientAddress) || ""}`,
-      `Please update my name to: ${(pkg && pkg.clientName) || ""}`,
-      `My only social security number is: ${ssn}`,
-      `My only and correct date of birth is: ${(pkg && pkg.dob) || ""}`,
-      ``,
-      `I do not wish to have any telephone numbers on my report.`,
-      ``,
-      `Please remove all the other addresses off my report, as they are not deliverable to me by the U.S. post office, and they are not reportable as per the FCRA, since they are inaccurate.`,
-      ``,
-      `Sincerely,`,
-      `${(pkg && pkg.clientName) || ""}`,
-      ``,
-      `Enc. Driver License, Passport, SSN Card, and Proof of Residence`,
-    ].join("\n");
+  function buildPersonalInfoText(bureauKey, p = pkg) {
+    return buildPersonalInfoTextPure(p, bureauKey);
   }
 
   // The per-bureau letters that lead the packet: a blank page for the client's
@@ -1692,7 +1959,7 @@ function ClientApp() {
   function setSlotFile(category, file) {
     if (!file) return;
     const r = new FileReader();
-    r.onload = ev => setSlots(prev => ({ ...prev, [category]: { name: file.name, type: file.type, dataUrl: ev.target.result } }));
+    r.onload = ev => updateSlots(prev => ({ ...prev, [category]: { name: file.name, type: file.type, dataUrl: ev.target.result } }));
     r.readAsDataURL(file);
   }
 
@@ -1914,7 +2181,7 @@ function ClientApp() {
                             <div style={{ fontSize: 11, color: slots[s.key] ? "#0f766e" : "#cbd5e1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{slots[s.key]?.name || (s.key === "affidavit" ? "Blank form added automatically unless you upload one" : "Not uploaded")}</div>
                           </div>
                           {slots[s.key] && (
-                            <button onClick={() => setSlots(prev => { const n = { ...prev }; delete n[s.key]; return n; })} style={{ background: "none", border: "none", color: "#cbd5e1", fontSize: 16, cursor: "pointer", padding: "0 4px" }}>✕</button>
+                            <button onClick={() => updateSlots(prev => { const n = { ...prev }; delete n[s.key]; return n; })} style={{ background: "none", border: "none", color: "#cbd5e1", fontSize: 16, cursor: "pointer", padding: "0 4px" }}>✕</button>
                           )}
                           <label style={{ fontSize: 12, fontWeight: 600, color: "#0f766e", border: "1.5px solid #99f6e4", borderRadius: 8, padding: "6px 12px", cursor: "pointer", flexShrink: 0 }}>
                             {slots[s.key] ? "Replace" : "Upload"}
@@ -2086,7 +2353,9 @@ function ClientApp() {
 
                     {pkg.disputeItems && (
                       <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", letterSpacing: ".5px", textTransform: "uppercase", marginBottom: 10 }}>Disputed Items (Section 611 accuracy)</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", letterSpacing: ".5px", textTransform: "uppercase", marginBottom: 10 }}>
+                          Disputed Items ({BUREAUS.some(b => splitDisputeItems(pkg, affidavitData, slots, b.key).block.length) ? "605B block + 611 accuracy" : "Section 611 accuracy"})
+                        </div>
                         {BUREAUS.map(b => (pkg.disputeItems[b.key]?.length > 0) && (
                           <div key={b.key} style={{ marginBottom: 10 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: b.color, marginBottom: 5 }}>{b.label}</div>
