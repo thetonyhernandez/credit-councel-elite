@@ -185,7 +185,7 @@ DOCUMENTS TO COLLECT
 TWO WAYS THE CLIENT CAN UPLOAD — support BOTH:
 - ALL AT ONCE: The client may drop every document and image together in one go. When several arrive in the same turn, read and extract from EVERY one of them that turn, tell the client everything you found across all of them (identity info, negative items, inquiries, personal-info issues), record each in "documentsReceived", and then ask only for whatever is still missing. Do not make them re-send one at a time.
 - ONE AT A TIME: If the client uploads a single document, seems unsure, or asks for help, guide them through the list above in order, one item per turn, explaining each — the step-by-step experience is preserved for anyone who needs it.
-Record each document in "documentsReceived" and never ask twice. Only ask for what is still missing. The FCRA 605B page is added automatically — do not ask for it.
+Record each document in "documentsReceived" and never ask twice. This field is not just your own note — the APP reads it to decide what to ask the client for next, so it must be accurate. Use plain labels the app can recognise: "credit report", "photo ID", "Social Security card", "proof of address", "FTC identity theft report". Add a document the moment you can see it in an uploaded file, whatever the file is named, and never list a document you have not actually seen. Only ask for what is still missing. The FCRA 605B page is added automatically — do not ask for it.
 MULTIPLE DOCUMENTS ON ONE FILE: A single uploaded file or image often contains more than one document — for example a photo ID and Social Security card on the same page, or an ID plus a utility bill. Look at the whole image. If you can see the Social Security card, the ID, and/or the proof of address anywhere in an uploaded file, record EACH of them in "documentsReceived" as received. NEVER ask the client to re-upload or "send separately" a document that is already visible in something they uploaded, even if it shares the page with other documents. If a required document is genuinely not visible in anything uploaded, ask only for that one.
 
 ═══════════════════════════════════════════
@@ -279,6 +279,39 @@ export function hasDoc(slots, d) {
 
 export function missingRequired(slots) {
   return REQUIRED_DOCS.filter(d => !hasDoc(slots, d));
+}
+
+// Filenames are a terrible source of truth — a client photographs their Social Security
+// card and it arrives as IMG_2931.png. The model DID read that file and records what it
+// saw in documentsReceived, so that confirmation counts as received too. Slots still
+// drive PDF assembly; this only governs what we ask the client for.
+const DOC_MATCHERS = {
+  creditReport:   /credit\s*report|myfreescorenow|identityiq|myscoreiq|3b\s*report/i,
+  photoID:        /photo\s*id|driver'?s?\s*licen|state\s*id|government\s*id|passport|\bid\b/i,
+  ssnCard:        /social\s*security|ssn\s*card|\bss\s*card\b|w-?2\b|1099|pay\s*stub|ssa\s*letter/i,
+  proofResidence: /proof\s*of\s*(current\s*)?address|proof\s*of\s*residen|utility|electric|bank\s*statement|lease/i,
+};
+
+export function modelReceived(profile) {
+  const seen = new Set();
+  const list = profile && Array.isArray(profile.documentsReceived) ? profile.documentsReceived : [];
+  const joined = list.map(x => String(x == null ? "" : x)).join(" | ");
+  if (!joined.trim()) return seen;
+  Object.keys(DOC_MATCHERS).forEach(k => { if (DOC_MATCHERS[k].test(joined)) seen.add(k); });
+  return seen;
+}
+
+// The single source of truth for "what do we still need". A document counts as in hand if
+// the app filed it into a slot OR the model confirmed reading it.
+export function missingDocs(slots, profile) {
+  const seen = modelReceived(profile);
+  return REQUIRED_DOCS.filter(d => !hasDoc(slots, d) && !seen.has(d.key));
+}
+
+export function ftcReportReceived(slots, profile) {
+  if (slots && (slots.ftcReport || slots.policeReport)) return true;
+  const list = profile && Array.isArray(profile.documentsReceived) ? profile.documentsReceived : [];
+  return /\bftc\b|identity\s*theft\s*report|identitytheft\.gov|police\s*report/i.test(list.join(" | "));
 }
 
 // Normalise a creditor/institution name so "CAPITAL ONE BANK USA" and "Capital One"
@@ -1034,18 +1067,20 @@ function ClientApp() {
   // one message after the client attached their FTC report.
   function buildAppState() {
     const s = slotsRef.current || {};
+    const prof = profileRef.current;
+    const seen = modelReceived(prof);
     const have = [];
-    REQUIRED_DOCS.forEach(d => { if (hasDoc(s, d)) have.push(d.label); });
-    if (s.ftcReport) have.push("FTC identity theft report");
-    if (s.policeReport) have.push("police report");
+    REQUIRED_DOCS.forEach(d => { if (hasDoc(s, d) || seen.has(d.key)) have.push(d.label); });
+    const ftcIn = ftcReportReceived(s, prof);
+    if (ftcIn) have.push("FTC identity theft report");
     const aff = affidavitRef.current;
     const affDone = !!(aff && aff.completed);
     if (affDone) have.push("Identity Theft Affidavit (completed in the app)");
-    const miss = missingRequired(s).map(d => d.label);
+    const miss = missingDocs(s, prof).map(d => d.label);
     const theft = !!idTheftRef.current;
     let next;
     if (miss.length) next = miss[0];
-    else if (theft && !s.ftcReport) next = "the FTC identity theft report (the app shows the upload box itself)";
+    else if (theft && !ftcIn) next = "the FTC identity theft report (the app shows the upload box itself)";
     else if (theft && !affDone) next = "the affidavit (the app opens the form itself — never ask the client to type it into the chat)";
     else next = "nothing is outstanding — ask your single next intake question, or output PACKAGE_READY if you have the disputed items";
     return [
@@ -1424,7 +1459,8 @@ function ClientApp() {
   // documents and stops the document list falling off once identity theft is raised.
   function advanceIntake(prefix) {
     const s = slotsRef.current || {};
-    const miss = missingRequired(s);
+    const miss = missingDocs(s, profileRef.current);
+    const ftcIn = ftcReportReceived(s, profileRef.current);
     const aff = affidavitRef.current;
     const affDone = !!(aff && aff.completed);
     const theft = !!idTheftRef.current;
@@ -1437,7 +1473,7 @@ function ClientApp() {
       pushAgentText(lead + DOC_ASK[miss[0].key] + tail);
       return;
     }
-    if (theft && !s.ftcReport) {
+    if (theft && !ftcIn) {
       pushAgentText(lead + "All four of your documents are in. The next step is your own FTC identity theft report — file it at IdentityTheft.gov, then upload the PDF here.");
       setMessages(prev => prev.some(m => m.from === "ftc_upload") ? prev : [...prev, { from: "ftc_upload" }]);
       return;
@@ -1459,8 +1495,8 @@ function ClientApp() {
   function maybeSurfacePending() {
     if (!idTheftRef.current) return;
     const s = slotsRef.current || {};
-    if (missingRequired(s).length) return;
-    if (!s.ftcReport) {
+    if (missingDocs(s, profileRef.current).length) return;
+    if (!ftcReportReceived(s, profileRef.current)) {
       setMessages(prev => prev.some(m => m.from === "ftc_upload") ? prev : [...prev, { from: "ftc_upload" }]);
       return;
     }
@@ -1525,7 +1561,7 @@ function ClientApp() {
     // What comes next is decided by the app, not the model: if documents are still
     // outstanding it asks for the next one, and only when everything is in does it call
     // the packet complete.
-    const done = !missingRequired(slotsRef.current || {}).length && !!(slotsRef.current || {}).ftcReport;
+    const done = !missingDocs(slotsRef.current || {}, profileRef.current).length && ftcReportReceived(slotsRef.current || {}, profileRef.current);
     if (pkg && done) {
       const first = pkg.clientName ? pkg.clientName.split(" ")[0] : "";
       setMessages(prev => [...prev, { from: "agent", text: `That was the last step${first ? ", " + first : ""}. Your FTC report and affidavit are both in and your three packages are complete in the Package tab. Print, sign, and notarize the affidavit, then Brandon will review before you mail.` }]);
@@ -1607,11 +1643,15 @@ function ClientApp() {
   // Infer which packet slot an uploaded file belongs to, from its filename.
   function inferSlot(name) {
     const n = (name || "").toLowerCase();
+    // Order matters. "IDTheftAffidavit.pdf" must not be read as an FTC report, and
+    // "IDTheftReport_OO_203764247.pdf" must not fall through to the generic "report"
+    // rule and be filed as the credit report — that misfile is what made the agent ask
+    // for the FTC report a second time after the client had already sent it.
     if (/passport/.test(n)) return "passport";
-    if (/\bftc\b|identitytheft|identity.?theft.?report|ftc.?report/.test(n)) return "ftcReport";
-    if (/affidavit|complaint|victim|idtheftaffidavit|\bh-?1\b/.test(n)) return "affidavit";
+    if (/affidavit|\bh-?1\b/.test(n)) return "affidavit";
+    if (/\bftc\b|identitytheft|identity.?theft|idtheft|id.?theft.?report/.test(n)) return "ftcReport";
     if (/police/.test(n)) return "policeReport";
-    if (/ssn|social/.test(n)) return "ssnCard";
+    if (/ssn|social.?security|\bss\b|\bss[ _-]?card\b|w-?2\b|1099|pay.?stub/.test(n)) return "ssnCard";
     if (/licen|driver|state.?id|photo.?id|\bdl\b|\bid\b/.test(n)) return "photoID";
     if (/bill|utility|electric|sdge|residence|lease|proof|address/.test(n)) return "proofResidence";
     if (/credit.?report|report|3b|tri|fico|score/.test(n)) return "creditReport";
