@@ -285,19 +285,33 @@ export function missingRequired(slots) {
 // card and it arrives as IMG_2931.png. The model DID read that file and records what it
 // saw in documentsReceived, so that confirmation counts as received too. Slots still
 // drive PDF assembly; this only governs what we ask the client for.
+// These must be tight. Marking a document received that we do NOT hold is far worse than
+// asking for it twice — it means the client mails an incomplete packet to the bureau.
+// A bare "id" is not enough (it matched "FTC ID theft report") and a Social Security
+// NUMBER read off the credit report is not a Social Security CARD.
 const DOC_MATCHERS = {
   creditReport:   /credit\s*report|myfreescorenow|identityiq|myscoreiq|3b\s*report/i,
-  photoID:        /photo\s*id|driver'?s?\s*licen|state\s*id|government\s*id|passport|\bid\b/i,
-  ssnCard:        /social\s*security|ssn\s*card|\bss\s*card\b|w-?2\b|1099|pay\s*stub|ssa\s*letter/i,
-  proofResidence: /proof\s*of\s*(current\s*)?address|proof\s*of\s*residen|utility|electric|bank\s*statement|lease/i,
+  photoID:        /photo\s*id|photo\s*identification|driver'?s?\s*licen|state[- ]issued\s*id|state\s*id\s*card|government[- ]issued|government\s*id|\bid\s*card\b|passport/i,
+  ssnCard:        /social\s*security\s*card|ssn\s*card|\bss\s*card\b|w-?2\b|1099|pay\s*stub|ssa\s*letter/i,
+  proofResidence: /proof\s*of\s*(current\s*)?address|proof\s*of\s*residen|utility\s*bill|electric\s*bill|bank\s*statement|lease\s*agreement/i,
 };
+
+// "still need proof of address" and "credit report not yet provided" are the model saying
+// something is MISSING. Read literally they marked it received and the app stopped asking.
+const NEGATED = /\b(not|no|never|without|missing|pending|awaiting|still\s+need|needs?|needed|required|request(ed|ing)?|outstanding|waiting|yet\s+to|to\s+be)\b/i;
 
 export function modelReceived(profile) {
   const seen = new Set();
   const list = profile && Array.isArray(profile.documentsReceived) ? profile.documentsReceived : [];
-  const joined = list.map(x => String(x == null ? "" : x)).join(" | ");
-  if (!joined.trim()) return seen;
-  Object.keys(DOC_MATCHERS).forEach(k => { if (DOC_MATCHERS[k].test(joined)) seen.add(k); });
+  const clean = list
+    .map(x => String(x == null ? "" : x))
+    .filter(x => x.trim() && !NEGATED.test(x));
+  if (!clean.length) return seen;
+  // Match per entry, not on one joined blob, so a negated entry cannot be rescued by a
+  // neighbouring one and one entry cannot satisfy two different documents by accident.
+  clean.forEach(entry => {
+    Object.keys(DOC_MATCHERS).forEach(k => { if (DOC_MATCHERS[k].test(entry)) seen.add(k); });
+  });
   return seen;
 }
 
@@ -318,7 +332,10 @@ export function fileKey(f) {
 export function ftcReportReceived(slots, profile) {
   if (slots && (slots.ftcReport || slots.policeReport)) return true;
   const list = profile && Array.isArray(profile.documentsReceived) ? profile.documentsReceived : [];
-  return /\bftc\b|identity\s*theft\s*report|identitytheft\.gov|police\s*report/i.test(list.join(" | "));
+  return list
+    .map(x => String(x == null ? "" : x))
+    .filter(x => x.trim() && !NEGATED.test(x))
+    .some(x => /\bftc\b|identity\s*theft\s*report|identitytheft\.gov|police\s*report/i.test(x));
 }
 
 // Normalise a creditor/institution name so "CAPITAL ONE BANK USA" and "Capital One"
@@ -824,6 +841,7 @@ function ClientApp() {
   // updates land a render later, and the API call that carries "what do we still need"
   // often goes out in the same tick as an upload — that lag is exactly why the agent kept
   // re-asking for a document the client had just attached.
+  const busyRef      = useRef(false);
   const uploadsRef   = useRef([]);
   const slotsRef     = useRef({});
   const affidavitRef = useRef(null);
@@ -856,6 +874,8 @@ function ClientApp() {
   // sure the "ready" message is announced only once.
   const [idTheftStarted, setIdTheftStarted] = useState(false);
   const [announcedReady, setAnnouncedReady] = useState(false);
+
+  useEffect(() => { busyRef.current = busy; }, [busy]);
 
   // Text-only Package sub-tabs (these support Copy and render as plain text).
   const TEXT_TABS = ["equifax", "experian", "transunion", "personalInfo", "handwrittenNote"];
@@ -1461,14 +1481,16 @@ function ClientApp() {
     if (announcedReady) return;
     setAnnouncedReady(true);
     const first = json.clientName ? json.clientName.split(" ")[0] : "";
-    const pending = idTheftStarted && !(affidavitData?.completed && slots.ftcReport);
+    const affDone = !!(affidavitRef.current && affidavitRef.current.completed);
+    const ftcIn = ftcReportReceived(slotsRef.current || {}, profileRef.current);
+    const pending = idTheftRef.current && !(affDone && ftcIn);
     const msg = pending
-      ? `Your dispute letters are drafted and in the Package tab${first ? ", " + first : ""}. This isn't ready to mail yet — please finish the identity-theft steps: ${slots.ftcReport ? "" : "upload your FTC report and "}complete the affidavit below. Once ${slots.ftcReport ? "it is" : "both are"} in, your packets are complete.`
+      ? `Your dispute letters are drafted and in the Package tab${first ? ", " + first : ""}. This isn't ready to mail yet — please finish the identity-theft steps: ${ftcIn ? "" : "upload your FTC report and "}complete the affidavit below. Once ${ftcIn ? "it is" : "both are"} in, your packets are complete.`
       : `Your three packages are ready${first ? ", " + first : ""}. Open the Package tab to review and download each bureau's PDF. Brandon will review before you print and mail.`;
     setMessages(prev => [...prev, { from: "agent", text: msg }]);
     // Don't let the packet look finished while the affidavit is still open — put the form
     // right in front of the client as the clear next action.
-    if (pending && !(affidavitData && affidavitData.completed)) {
+    if (pending && !affDone) {
       setTimeout(() => surfaceAffidavitForm(null), 600);
     }
   }
@@ -1524,7 +1546,13 @@ function ClientApp() {
   // next thing and asks for it. Order is fixed: the four required documents, then the FTC
   // report, then the affidavit. This is what stops the affidavit jumping ahead of the ID
   // documents and stops the document list falling off once identity theft is raised.
-  function advanceIntake(prefix) {
+  function advanceIntake(prefix, tries = 0) {
+    // A client can attach the FTC report while the agent is still reading their last
+    // upload. generatePackages and sendProgrammatic both no-op when busy, so the next
+    // step used to vanish and the client was left staring at a finished-looking screen.
+    if (busyRef.current) {
+      if (tries < 40) { setTimeout(() => advanceIntake(prefix, tries + 1), 500); return; }
+    }
     const s = slotsRef.current || {};
     const miss = missingDocs(s, profileRef.current);
     const ftcIn = ftcReportReceived(s, profileRef.current);
@@ -1899,7 +1927,9 @@ function ClientApp() {
   function printBureau(bureauKey) {
     const b = BUREAUS.find(x => x.key === bureauKey);
     if (!b || !pkg?.[bureauKey]) return;
-    let body = `<div class="sec"><h2 style="color:${b.color}">Cover Letter — ${b.label}</h2><div class="banner">HANDWRITE THIS — copy it word for word in blue or black ink on plain white paper.</div><pre>${pkg[bureauKey] || ""}</pre></div>`;
+    // Must be the code-built letter, same as the PDF. Printing pkg[bureauKey] here sent
+    // the model's Section 611 draft even when the client's affidavit put items on 605B.
+    let body = `<div class="sec"><h2 style="color:${b.color}">Cover Letter — ${b.label}</h2><div class="banner">HANDWRITE THIS — copy it word for word in blue or black ink on plain white paper.</div><pre>${buildCoverLetterText(bureauKey)}</pre></div>`;
     if (pkg.personalInfoNeeded) body += `<div class="pb"></div><div class="sec"><h2>Personal Information Correction Letter</h2><pre>${buildPersonalInfoText(bureauKey)}</pre></div>`;
     body += `<div class="pb"></div><div class="sec"><h2 style="color:#059669">Mail Packet — Assembly Order</h2><pre>${pkg.packetOrder || ""}</pre>`;
     if (pkg.checklist?.length) body += `<h3>Document Checklist</h3><ul>${pkg.checklist.map(c => `<li>${c}</li>`).join("")}</ul>`;
@@ -2047,7 +2077,7 @@ function ClientApp() {
     if (!pkg) return;
     const w = window.open("", "_blank");
     let body = "";
-    BUREAUS.forEach((b, i) => { if (pkg[b.key]) body += `<div class="sec"><h2 style="color:${b.color}">${b.label}</h2><pre>${pkg[b.key]}</pre></div>${i < 2 ? '<div class="pb"></div>' : ""}`; });
+    BUREAUS.forEach((b, i) => { if (pkg[b.key]) body += `<div class="sec"><h2 style="color:${b.color}">${b.label}</h2><pre>${buildCoverLetterText(b.key)}</pre></div>${i < 2 ? '<div class="pb"></div>' : ""}`; });
     if (pkg.personalInfoNeeded) body += `<div class="pb"></div><div class="sec"><h2>Personal Information Correction</h2><pre>${buildPersonalInfoText("equifax")}</pre></div>`;
     if (pkg.checklist?.length) body += `<div class="pb"></div><div class="sec"><h2>Document Checklist</h2><ul>${pkg.checklist.map(c => `<li>${c}</li>`).join("")}</ul></div>`;
     w.document.write(`<!DOCTYPE html><html><head><title>Credit Counsel Elite</title><style>body{font-family:Georgia,serif;max-width:740px;margin:40px auto;padding:0 24px;color:#111;line-height:1.85}h1{color:#0f172a}.sub{color:#888;font-size:12px;margin-bottom:32px}h2{border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-bottom:16px}.sec{margin-bottom:48px}.pb{page-break-after:always;margin:48px 0;border-top:2px dashed #e2e8f0}pre{white-space:pre-wrap;font-size:12px;line-height:1.9;font-family:Georgia,serif}ul{line-height:2.2;font-size:13px}@media print{.pb{page-break-after:always}}</style></head><body><h1>Credit Counsel Elite</h1><div class="sub">Dispute Package — ${new Date().toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</div>${body}</body></html>`);
