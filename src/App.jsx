@@ -308,6 +308,13 @@ export function missingDocs(slots, profile) {
   return REQUIRED_DOCS.filter(d => !hasDoc(slots, d) && !seen.has(d.key));
 }
 
+// A file the client already sent. Re-sending it must not add a second copy of the page
+// to the mail packet, must not inflate the "N uploaded" counter, and must not cost
+// another read. Name plus size identifies it well enough for this purpose.
+export function fileKey(f) {
+  return `${(f && f.name) || ""}::${(f && f.size) != null ? f.size : ""}`;
+}
+
 export function ftcReportReceived(slots, profile) {
   if (slots && (slots.ftcReport || slots.policeReport)) return true;
   const list = profile && Array.isArray(profile.documentsReceived) ? profile.documentsReceived : [];
@@ -817,6 +824,7 @@ function ClientApp() {
   // updates land a render later, and the API call that carries "what do we still need"
   // often goes out in the same tick as an upload — that lag is exactly why the agent kept
   // re-asking for a document the client had just attached.
+  const uploadsRef   = useRef([]);
   const slotsRef     = useRef({});
   const affidavitRef = useRef(null);
   const idTheftRef   = useRef(false);
@@ -960,7 +968,7 @@ function ClientApp() {
           if (s.pkg) setPkg(s.pkg);
           if (s.slots) { slotsRef.current = s.slots; setSlots(s.slots); }
           if (Array.isArray(s.docFiles)) setDocFiles(s.docFiles);
-          if (Array.isArray(s.uploads)) setUploads(s.uploads);
+          if (Array.isArray(s.uploads)) { uploadsRef.current = s.uploads; setUploads(s.uploads); }
           if (typeof s.progress === "number") setProgress(s.progress);
           if (s.statusTxt) setStatusTxt(s.statusTxt);
           if (s.approved) setApproved(true);
@@ -1035,7 +1043,7 @@ function ClientApp() {
     if (!window.confirm("Reset the process? This clears all current progress on this device and starts a brand-new client.")) return;
     try { localStorage.removeItem(SESSION_KEY); } catch {}
     setMessages([]); setHistory([]); setPkg(null); setSlots({}); setDocFiles([]);
-    setUploads([]); setProgress(0); setStatusTxt("Ready to begin"); setApproved(false);
+    setUploads([]); uploadsRef.current = []; setProgress(0); setStatusTxt("Ready to begin"); setApproved(false);
     setClientId(null); setProfile(null); profileRef.current = null; setDocTab("equifax"); setTab(0);
     setAffidavitData(null); affidavitRef.current = null; setShowAffidavit(false);
     slotsRef.current = {};
@@ -1202,27 +1210,67 @@ function ClientApp() {
     try { return JSON.parse(after.slice(start, end + 1)); } catch { return null; }
   }
 
+  // A plain-English inventory of what the app is holding. Sent with the generate
+  // directive so the model cannot decide something is missing when it is not.
+  function inventoryLine() {
+    const sl = slotsRef.current || {};
+    const prof = profileRef.current || {};
+    const have = [];
+    REQUIRED_DOCS.forEach(d => { if (hasDoc(sl, d) || modelReceived(prof).has(d.key)) have.push(d.label); });
+    if (ftcReportReceived(sl, prof)) have.push("FTC identity theft report");
+    if (affidavitRef.current && affidavitRef.current.completed) have.push("completed Identity Theft Affidavit");
+    const di = prof.disputeItems || {};
+    const items = ["equifax", "experian", "transunion"]
+      .map(k => `${k}: ${((di[k] || []).join("; ")) || "(none recorded)"}`).join(" / ");
+    return `On file with the app: ${have.length ? have.join(", ") : "nothing"}. Client name: ${prof.clientName || "(unknown)"}. Address: ${prof.clientAddress || "(unknown)"}. DOB: ${prof.dob || "(unknown)"}. SSN last 4: ${prof.ssn4 || "(unknown)"}. Items the client chose to dispute — ${items}.`;
+  }
+
+  // Has the client actually told us which items to dispute? Without that there is nothing
+  // to put in a letter, and it is the ONLY thing worth asking about at this stage.
+  function hasDisputeSelection() {
+    const di = (profileRef.current || {}).disputeItems || {};
+    return ["equifax", "experian", "transunion"].some(k => (di[k] || []).length > 0);
+  }
+
   async function generatePackages() {
     if (busy) return;
     setBusy(true); setStatusTxt("Building your packages…"); setProgress(95);
     try {
-      const directive = { role: "user", content: "Generate the three dispute packages now. Output ONLY the PACKAGE_READY block — the line PACKAGE_READY: followed by the JSON object — using all client info and the items the client chose to dispute. No prose, no questions, nothing before or after the block." };
-      const txt = await callAPI([...history, directive], 8000);
-      const { clean, state } = extractState(txt);
-      applyState(state);
-      const json = parsePackage(clean);
+      let json = null;
+      // Two attempts. The second states the inventory explicitly and forbids questions,
+      // because the usual failure is the model asking for something it already has.
+      for (let attempt = 0; attempt < 2 && !json; attempt++) {
+        const directive = {
+          role: "user",
+          content: attempt === 0
+            ? "Generate the three dispute packages now. Output ONLY the PACKAGE_READY block — the line PACKAGE_READY: followed by the JSON object — using all client info and the items the client chose to dispute. No prose, no questions, nothing before or after the block."
+            : `${inventoryLine()}\n\nEverything needed is present. Do NOT ask for anything and do NOT reply with prose. Output ONLY the PACKAGE_READY block: the line PACKAGE_READY: followed by the JSON object. If a disputed-item list is empty for a bureau, use the items recorded for the other bureaus.`,
+        };
+        if (attempt > 0) setStatusTxt("Building your packages… (retrying)");
+        const txt = await callAPI([...history, directive], 8000);
+        const { clean, state } = extractState(txt);
+        applyState(state);
+        json = parsePackage(clean);
+        if (json) setHistory(prev => [...prev, directive, { role: "assistant", content: clean }]);
+      }
+
       if (json) {
-        setHistory(prev => [...prev, directive, { role: "assistant", content: clean }]);
         await announcePackage(json, { review: false });
+      } else if (!hasDisputeSelection()) {
+        // The genuine gap. Ask the ONE thing that is actually missing — never send the
+        // client back to re-upload documents the app is already holding.
+        setProgress(85); setStatusTxt("Waiting on your selection"); setTab(0);
+        pushAgentText("I have your documents. The last thing I need is your decision: which items on your report do you believe are inaccurate or do not belong to you? Tell me which ones and I will build all three packages.");
       } else {
-        setProgress(80); setStatusTxt("Could not generate");
-        setTab(0);
-        setMessages(prev => [...prev, { from: "agent", text: "I could not assemble the packages yet — I may still be missing a required item (credit report, photo ID, proof of address, or your selection of which items to dispute). Add what is missing in Intake, then try again." }]);
+        // Documents and selection are both in, so this is a hiccup on our side. Telling
+        // the client to re-upload was wrong — it is what made them send everything twice.
+        setProgress(85); setStatusTxt("Retrying shortly"); setTab(0);
+        pushAgentText("Your documents and your list of items are all saved — nothing is missing on your end, so please do not upload anything again. The package builder hit a snag. Open the Package tab and press Generate packages to try once more, and Brandon will be notified if it keeps happening.");
       }
     } catch (e) {
       console.error("generatePackages error:", e.message);
       setStatusTxt("Generation error"); setTab(0);
-      setMessages(prev => [...prev, { from: "agent", text: "Error building packages: " + e.message + ". Please screenshot this." }]);
+      setMessages(prev => [...prev, { from: "agent", text: "Error building packages: " + e.message + "\n\nNothing you sent was lost — please do not re-upload. Screenshot this message for Brandon." }]);
     }
     setBusy(false);
   }
@@ -1277,10 +1325,22 @@ function ClientApp() {
   }
 
   async function handleFiles(fileList) {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
+    const all = Array.from(fileList || []);
+    if (!all.length) return;
 
-    setUploads(prev => [...prev, ...files.map(f => ({ name: f.name, size: f.size }))]);
+    // Skip anything already on file. Stephen re-sent all four documents after a failed
+    // build and ended up with 8 uploads and duplicate pages in the packet.
+    const known = new Set((uploadsRef.current || []).map(fileKey));
+    const files = all.filter(f => !known.has(fileKey(f)));
+    const dupes = all.filter(f => known.has(fileKey(f)));
+    if (dupes.length) {
+      setMessages(prev => [...prev, { from: "agent", text: `I already have ${dupes.length === 1 ? dupes[0].name : dupes.length + " of those files"} — no need to send ${dupes.length === 1 ? "it" : "them"} again.` }]);
+    }
+    if (!files.length) { advanceIntake(null); return; }
+
+    const nextUploads = [...(uploadsRef.current || []), ...files.map(f => ({ name: f.name, size: f.size }))];
+    uploadsRef.current = nextUploads;
+    setUploads(nextUploads);
     setMessages(prev => [...prev, { from: "user", text: `Uploading: ${files.map(f => f.name).join(", ")}` }]);
     setBusy(true);
     setStatusTxt("Uploading documents...");
@@ -1298,7 +1358,12 @@ function ClientApp() {
     })));
 
     const docs = fileData.filter(f => f.type.startsWith("image/") || f.type === "application/pdf");
-    setDocFiles(prev => [...prev, ...docs.map(f => ({ name: f.name, type: f.type, dataUrl: f.data }))]);
+    setDocFiles(prev => {
+      const have = new Set(prev.map(d => fileKey(d)));
+      const add = docs.map(f => ({ name: f.name, type: f.type, size: f.size, dataUrl: f.data }))
+                      .filter(d => !have.has(fileKey(d)));
+      return [...prev, ...add];
+    });
     updateSlots(prev => {
       const next = { ...prev };
       for (const f of docs) {
@@ -1371,7 +1436,9 @@ function ClientApp() {
       }
     } catch (e) {
       setHistory(lightenAll(history));
-      setUploads(prev => prev.slice(0, -files.length));
+      const rolled = (uploadsRef.current || []).slice(0, -files.length);
+      uploadsRef.current = rolled;
+      setUploads(rolled);
       if (e.message.includes("413")) {
         setMessages(prev => [...prev, { from: "agent", text: "That file was too large to process, so I cleared it from our chat. It is still saved in your storage. Upload a smaller PDF or a photo of the report, or type the key details and we will continue." }]);
       } else {
