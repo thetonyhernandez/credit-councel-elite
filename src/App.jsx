@@ -24,7 +24,7 @@ const SESSION_KEY = "cce_session_v2";
 // uploaded documents, and a quota failure on one can never take the other down.
 const AFFIDAVIT_DRAFT_KEY = "cce_affidavit_draft_v1";
 
-const SYSTEM = `You are the official AI intake agent for Credit Counsel Elite, a premium credit repair service operated by Brandon. You are as knowledgeable as Brandon himself — warm, authoritative, precise, and genuinely invested in every client's success. You guide clients through the process from intake to generating their dispute packages.
+const SYSTEM = `You are the official AI intake agent for Credit Counsel Elite, the premium credit repair service Credit Counsel Elite (CCE). You are as knowledgeable as CCE's founder — warm, authoritative, precise, and genuinely invested in every client's success. You guide clients through the process from intake to generating their dispute packages.
 
 ═══════════════════════════════════════════
 CORE PRINCIPLE — READ THIS FIRST
@@ -103,8 +103,8 @@ Six factors: payment history 100%, utilization 0-3%, derogatory remarks 0, credi
 - Mass apply only at 800+: 4-5 cards at a time; 780+ gets best rates.
 
 IMPORTANT RULES:
-- Talk to Brandon first before: legal issues, bankruptcy, debt settlement, big purchases, loans, paying collections, closing accounts, co-signing, rapid applications.
-- Never pay a collection without talking to Brandon first.
+- Talk to CCE first before: legal issues, bankruptcy, debt settlement, big purchases, loans, paying collections, closing accounts, co-signing, rapid applications.
+- Never pay a collection without talking to CCE first.
 
 ═══════════════════════════════════════════
 THE PACKAGE (per bureau)
@@ -167,7 +167,7 @@ IN-CHAT IDENTITY-THEFT STEPS: When the client answers that one or more items WER
 - Briefly tell them to file their own report at IdentityTheft.gov, then output the token FTC_REPORT_STEP on its own line (an upload box for the report they create).
 - The affidavit form is opened by the app itself, once the four required documents AND the FTC report are in. Output the token AFFIDAVIT_STEP only when the app state names the affidavit as the one thing to ask for this turn.
 IDENTITY-THEFT PATH IS STICKY: Once the client has said an item was identity theft, both the FTC report AND the affidavit are required parts of their packet. If you still need other documents (photo ID, SSN card, proof of address), keep collecting them ONE AT A TIME — the affidavit does not replace them and must not push them off the list. After the FTC report is uploaded, the app returns to any outstanding documents and then shows the affidavit form automatically — do not tell the client the intake is finished, do not ask "shall I build the packages," and do not output PACKAGE_READY as if everything is done while the affidavit is still outstanding. The letters may be built in parallel, but every reply while the affidavit is incomplete must state plainly that the packet is not complete to mail until the client completes the affidavit. Never imply the case is ready when the affidavit is still open.
-HOW TO GUIDE THE FORM (do this when the app opens the affidavit): explain how to complete it, not what to claim. Tell them: enter your legal name, date of birth, SSN, driver's license, and current address; answer whether your name, address or phone has changed since the fraud, and if it has, enter what they were then; for the three declarations, check only what is true for you; the form asks whether you know who used your information — answer no and skip it if you don't, and enter only what you actually know if you do; the description of how the theft happened should match the personal statement in your own FTC report; in the accounts section, list ONLY the specific items you personally know were opened or used without your authorization — in your own words; then print, sign, and have it notarized. You may explain what each field means. You must NOT tell the client which accounts to list, must NOT suggest that any identified negative is fraud, and must NOT characterize items as identity theft on their behalf. The choice of which items to include is entirely theirs.
+HOW TO GUIDE THE FORM (do this when the app opens the affidavit): explain how to complete it, not what to claim. Tell them: enter your legal name, date of birth, SSN, driver's license, and current address; answer whether your name, address or phone has changed since the fraud, and if it has, enter what they were then; for the three declarations, check only what is true for you; the form asks whether you know who used your information — answer no and skip it if you don't, and enter only what you actually know if you do; the description of how the theft happened should match the personal statement in your own FTC report; the form separates accounts from inquiries and they must not be mixed — section (18) is for hard inquiries only, meaning a company that pulled their credit without authorization, with the company name as it appears on the report and the date of that inquiry, and section (19) is for accounts only, meaning an account opened in their name or an existing account taken over; in each, list ONLY the specific items they personally know were unauthorized — in their own words; then print, sign, and have it notarized. You may explain what each field means. You must NOT tell the client which accounts to list, must NOT suggest that any identified negative is fraud, and must NOT characterize items as identity theft on their behalf. The choice of which items to include is entirely theirs.
 Output each token at most once. If the client says none were identity theft (only inaccurate or not theirs), do NOT output the tokens — proceed to build and dispute on accuracy grounds under Section 611.
 
 THE FTC REPORT:
@@ -196,7 +196,7 @@ When you have the client name, address, DOB, SSN last-4, and the items the clien
 Output EXACTLY this (your short reply text may precede it if a question remains). The three bureau letters MUST be the COVER LETTER template reproduced word for word — only the bureau name/address, the client's info, and the numbered item lines change:
 
 PACKAGE_READY:
-{"clientName":"[full name]","clientAddress":"[full address]","dob":"[dob]","ssn4":"[last 4]","equifax":"[the Section 611 COVER LETTER reproduced verbatim, addressed to Equifax, items as numbered lines]","experian":"[same letter, addressed to Experian]","transunion":"[same letter, addressed to TransUnion]","personalInfoNeeded":true_or_false,"handwrittenNote":"Copy this letter by hand word for word on plain white paper in blue or black ink. Handwriting it shows the bureau this is a personal request, not a printed template. Do not type it.","disputeItems":{"equifax":["CREDITOR — TYPE — date"],"experian":["..."],"transunion":["..."]},"checklist":["MyFreeScoreNow credit report — relevant pages, highlighted in yellow or blue, NO pink","Government photo ID — show the photo and all four corners, no dark spots","Social Security card — all four corners AND the signature on the front","Proof of current address — utility bill or bank statement showing name and address; crop out or cover the date so it is not visible (no signature needed)","Identity Theft Affidavit — ONLY if you are a genuine identity theft victim and completed it yourself; notarized","FCRA 605B page (added automatically)"],"packetOrder":"1. Cover Letter (handwritten) → 2. Personal Info Letter (if needed) → 3. ID Page → 4. Credit Report Pages → 5. Affidavit (only if you completed it) → 6. FCRA 605B","brandonsNotes":"[2-3 sentences for Brandon: anything unusual or worth double-checking]"}
+{"clientName":"[full name]","clientAddress":"[full address]","dob":"[dob]","ssn4":"[last 4]","equifax":"[the Section 611 COVER LETTER reproduced verbatim, addressed to Equifax, items as numbered lines]","experian":"[same letter, addressed to Experian]","transunion":"[same letter, addressed to TransUnion]","personalInfoNeeded":true_or_false,"handwrittenNote":"Copy this letter by hand word for word on plain white paper in blue or black ink. Handwriting it shows the bureau this is a personal request, not a printed template. Do not type it.","disputeItems":{"equifax":["CREDITOR — TYPE — date"],"experian":["..."],"transunion":["..."]},"checklist":["MyFreeScoreNow credit report — relevant pages, highlighted in yellow or blue, NO pink","Government photo ID — show the photo and all four corners, no dark spots","Social Security card — all four corners AND the signature on the front","Proof of current address — utility bill or bank statement showing name and address; crop out or cover the date so it is not visible (no signature needed)","Identity Theft Affidavit — ONLY if you are a genuine identity theft victim and completed it yourself; notarized","FCRA 605B page (added automatically)"],"packetOrder":"1. Cover Letter (handwritten) → 2. Personal Info Letter (if needed) → 3. ID Page → 4. Credit Report Pages → 5. Affidavit (only if you completed it) → 6. FCRA 605B","brandonsNotes":"[2-3 sentences for the CCE reviewer: anything unusual or worth double-checking]"}
 
 ═══════════════════════════════════════════
 MEMORY PROTOCOL — CRITICAL (this is what stops re-asking)
@@ -216,7 +216,7 @@ Carry EVERY known value forward; never blank a field that was filled. The client
 4. Always move FORWARD. Each turn asks for the ONE next missing item (nextNeeded) or, when everything is present, generates the package. Never loop back.
 
 CONVERSATION RULES:
-- You are as knowledgeable as Brandon — answer any credit question with confidence and accuracy.
+- You are as knowledgeable as CCE's most experienced advisor — answer any credit question with confidence and accuracy.
 - TONE: precise, clear, professional. Short plain sentences. No emojis, no hype.
 - NO MARKDOWN. No asterisks, bold, or headings — they render literally. Plain sentences; if you must list, use a simple hyphen.
 - Keep replies brief: one line confirming what you received, then the single next step.
@@ -262,7 +262,7 @@ export const REQUIRED_DOCS = [
 ];
 
 // One deterministic sentence per document, so the single next step is always asked in
-// Brandon's words with no round trip to the model to get it wrong.
+// CCE's words with no round trip to the model to get it wrong.
 const DOC_ASK = {
   creditReport:   "Next I need your credit report from MyFreeScoreNow. Log in, open 3B Reports, switch to Classic View, then save it as a PDF and upload it here.",
   photoID:        "Next I need your government photo ID. Show the photo and all four corners, no glare and no dark spots — bureaus reject IDs with cropped corners.",
@@ -587,6 +587,7 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
       crimeInfo: "", doc16ID: false, doc16Proof: false,
       info17A: "", info17B: "", info17C: "",
       company18A: "", company18B: "", company18C: "",
+      company18ADate: "", company18BDate: "", company18CDate: "",
       law20: "", ftcNumber: "",
     };
     const src = initial && typeof initial === "object" ? initial : null;
@@ -742,7 +743,18 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
         )}
 
         <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>(19) The accounts/inquiries you say are fraud</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>(18) The inquiries you say are fraud</div>
+        <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Hard inquiries only — a company that pulled your credit without your authorization. Enter the company name exactly as it appears on your report and the date of the inquiry. The official form has room for three; if you have more, list the rest in section (15).</div>
+        {[["A", f.company18A, f.company18ADate], ["B", f.company18B, f.company18BDate], ["C", f.company18C, f.company18CDate]].map(([sfx, name, date]) => (
+          <div key={sfx} style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 3 }}><input style={inp} placeholder={sfx === "A" ? "Company name" : "(optional)"} value={name} onChange={e => set("company18" + sfx, e.target.value)} /></div>
+            <div style={{ flex: 1 }}><input style={inp} placeholder="Date mm/dd/yyyy" value={date} onChange={e => set("company18" + sfx + "Date", e.target.value)} /></div>
+          </div>
+        ))}
+
+        <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>(19) The accounts you say are fraud</div>
+        <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Accounts only — an account someone opened in your name, or one of your existing accounts they took over. Hard inquiries do not go here; they go in section (18) above.</div>
         {accts.map((a, i) => (
           <div key={i} style={{ border: "1px solid #f1f5f9", borderRadius: 10, padding: 10, marginBottom: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -790,11 +802,6 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
         <input style={inp} placeholder="e.g. My report shows the wrong name — my correct name is..." value={f.info17A} onChange={e => set("info17A", e.target.value)} />
         <input style={inp} placeholder="(optional second line)" value={f.info17B} onChange={e => set("info17B", e.target.value)} />
         <input style={inp} placeholder="(optional third line)" value={f.info17C} onChange={e => set("info17C", e.target.value)} />
-
-        <label style={lab}>(18) Companies whose inquiries you say are from the theft</label>
-        <input style={inp} placeholder="Company name(s)" value={f.company18A} onChange={e => set("company18A", e.target.value)} />
-        <input style={inp} placeholder="(optional)" value={f.company18B} onChange={e => set("company18B", e.target.value)} />
-        <input style={inp} placeholder="(optional)" value={f.company18C} onChange={e => set("company18C", e.target.value)} />
 
         <div style={{ ...lab, marginTop: 6, marginBottom: 6 }}>(20) Law enforcement report</div>
         {seg({ get: f.law20, set: v => set("law20", v) }, [["notfiled", "Haven't filed"], ["unable", "Was unable to file"], ["automated", "Filed automated"], ["inperson", "Filed in person"]])}
@@ -1285,12 +1292,12 @@ function ClientApp() {
         // Documents and selection are both in, so this is a hiccup on our side. Telling
         // the client to re-upload was wrong — it is what made them send everything twice.
         setProgress(85); setStatusTxt("Retrying shortly"); setTab(0);
-        pushAgentText("Your documents and your list of items are all saved — nothing is missing on your end, so please do not upload anything again. The package builder hit a snag. Open the Package tab and press Generate packages to try once more, and Brandon will be notified if it keeps happening.");
+        pushAgentText("Your documents and your list of items are all saved — nothing is missing on your end, so please do not upload anything again. The package builder hit a snag. Open the Package tab and press Generate packages to try once more, and CCE will be notified if it keeps happening.");
       }
     } catch (e) {
       console.error("generatePackages error:", e.message);
       setStatusTxt("Generation error"); setTab(0);
-      setMessages(prev => [...prev, { from: "agent", text: "Error building packages: " + e.message + "\n\nNothing you sent was lost — please do not re-upload. Screenshot this message for Brandon." }]);
+      setMessages(prev => [...prev, { from: "agent", text: "Error building packages: " + e.message + "\n\nNothing you sent was lost — please do not re-upload. Screenshot this message for CCE." }]);
     }
     setBusy(false);
   }
@@ -1486,7 +1493,7 @@ function ClientApp() {
     const pending = idTheftRef.current && !(affDone && ftcIn);
     const msg = pending
       ? `Your dispute letters are drafted and in the Package tab${first ? ", " + first : ""}. This isn't ready to mail yet — please finish the identity-theft steps: ${ftcIn ? "" : "upload your FTC report and "}complete the affidavit below. Once ${ftcIn ? "it is" : "both are"} in, your packets are complete.`
-      : `Your three packages are ready${first ? ", " + first : ""}. Open the Package tab to review and download each bureau's PDF. Brandon will review before you print and mail.`;
+      : `Your three packages are ready${first ? ", " + first : ""}. Open the Package tab to review and download each bureau's PDF. CCE will review before you print and mail.`;
     setMessages(prev => [...prev, { from: "agent", text: msg }]);
     // Don't let the packet look finished while the affidavit is still open — put the form
     // right in front of the client as the clear next action.
@@ -1659,7 +1666,7 @@ function ClientApp() {
     const done = !missingDocs(slotsRef.current || {}, profileRef.current).length && ftcReportReceived(slotsRef.current || {}, profileRef.current);
     if (pkg && done) {
       const first = pkg.clientName ? pkg.clientName.split(" ")[0] : "";
-      setMessages(prev => [...prev, { from: "agent", text: `That was the last step${first ? ", " + first : ""}. Your FTC report and affidavit are both in and your three packages are complete in the Package tab. Print, sign, and notarize the affidavit, then Brandon will review before you mail.` }]);
+      setMessages(prev => [...prev, { from: "agent", text: `That was the last step${first ? ", " + first : ""}. Your FTC report and affidavit are both in and your three packages are complete in the Package tab. Print, sign, and notarize the affidavit, then CCE will review before you mail.` }]);
     } else {
       setTimeout(() => advanceIntake("Your affidavit is saved."), 450);
     }
@@ -2045,9 +2052,11 @@ function ClientApp() {
     put(2, 110, 492, ans.info17A, 9);
     put(2, 110, 512, ans.info17B, 9);
     put(2, 110, 532, ans.info17C, 9);
-    put(2, 178, 592, ans.company18A, 9);
-    put(2, 178, 612, ans.company18B, 9);
-    put(2, 178, 632, ans.company18C, 9);
+    // Section 18's printed line only labels "Company Name:", but the team needs the date
+    // of each inquiry on the form too, so it prints at the right-hand end of the same rule.
+    put(2, 178, 592, ans.company18A, 9); put(2, 395, 592, ans.company18ADate, 9);
+    put(2, 178, 612, ans.company18B, 9); put(2, 395, 612, ans.company18BDate, 9);
+    put(2, 178, 632, ans.company18C, 9); put(2, 395, 632, ans.company18CDate, 9);
 
     // Page 4 (H-4) — fraud account blocks (up to 3), all client-entered
     const blocks = [
@@ -2454,7 +2463,7 @@ function ClientApp() {
                   <div style={{ display: "flex", gap: 8 }}>
                     {!approved ? (
                       <button onClick={() => setShowReview(true)} style={{ flex: 1, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#fef3c7", border: "1.5px solid #fde68a", color: "#92400e" }}>
-                        ⚡ Brandon — Review
+                        ⚡ CCE — Review
                       </button>
                     ) : (
                       <button onClick={printAll} className="action-btn" style={{ flex: 1, height: 42, borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: "#1e3a8a", border: "none", color: "#fff" }}>
@@ -2469,14 +2478,14 @@ function ClientApp() {
             {/* Affidavit fill-in form */}
             {/* Affidavit is the official FTC form (download/upload in the Affidavit tab) */}
 
-            {/* Brandon review sheet */}
+            {/* CCE review sheet */}
             {showReview && pkg && (
               <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setShowReview(false); }}>
                 <div className="sheet">
                   <div className="sheet-handle" />
                   <div style={{ padding: "0 20px" }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Brandon's Review</div>
-                    <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 20 }}>Quick check before client prints and mails</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>CCE Review</div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 20 }}>Quick check before the client prints and mails</div>
 
                     <div style={{ background: "#f8faff", borderRadius: 12, padding: "14px 16px", marginBottom: 14, border: "1px solid #e8f0fe" }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: "#1e3a8a", letterSpacing: ".5px", textTransform: "uppercase", marginBottom: 10 }}>Client</div>
@@ -2526,7 +2535,7 @@ function ClientApp() {
         {tab === 2 && (
           <div style={{ flex: 1, overflowY: "auto", padding: "0 0 24px" }}>
             <div style={{ padding: "18px 18px 14px", background: "#fff", borderBottom: "1px solid #f1f5f9" }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>Brandon's Credit Sweep System</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>The CCE Credit Sweep System</div>
               <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>Follow these steps in exact order.</div>
             </div>
             <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2554,7 +2563,7 @@ function ClientApp() {
                 </div>
                 <div>
                   <div style={{ color: "rgba(255,255,255,.6)", fontSize: 11, fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", marginBottom: 3 }}>
-                    {approved ? "Package Approved — Ready to Mail" : ready ? "Pending Brandon's Review" : "Intake In Progress"}
+                    {approved ? "Package Approved — Ready to Mail" : ready ? "Pending CCE Review" : "Intake In Progress"}
                   </div>
                   <div style={{ color: "#fff", fontSize: 19, fontWeight: 700 }}>{pkg?.clientName || "Your Credit Case"}</div>
                 </div>
@@ -2563,7 +2572,7 @@ function ClientApp() {
                 { label: "Intake Started",     done: progress > 5 },
                 { label: "Documents Uploaded", done: uploads.length > 0 },
                 { label: "Package Generated",  done: ready },
-                { label: "Brandon Approved",   done: approved },
+                { label: "CCE Approved",      done: approved },
                 { label: "Ready to Mail",      done: approved },
               ].map((s, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < 4 ? 8 : 0 }}>
@@ -2621,7 +2630,7 @@ function ClientApp() {
                   { done: uploads.length > 0, icon: "📎", label: "Upload your documents",      sub: "Credit report, ID, SSN card, utility bill",   action: () => { setTab(0); setTimeout(() => fileRef.current?.click(), 300); }, btn: "Upload" },
                   { done: ready,              icon: "📋", label: "Package generated",           sub: "AI built your 3-bureau letters",              action: () => setTab(1), btn: "Review" },
                   { done: !!(slots.affidavit || affidavitData?.completed), icon: "📝", label: "Affidavit (only if a victim)", sub: "Official FTC form — fill it out yourself", action: () => { setTab(1); setDocTab("affidavit"); }, btn: ready ? "Open" : null },
-                  { done: approved,           icon: "⚡", label: "Brandon reviews your case",   sub: "Usually within 24 hours",                     action: null, btn: null },
+                  { done: approved,           icon: "⚡", label: "CCE reviews your case",       sub: "Usually within 24 hours",                     action: null, btn: null },
                   { done: false,              icon: "📬", label: "Print & mail your letters",   sub: "Send via USPS Certified Mail",                action: () => setTab(1), btn: approved ? "Print" : null },
                 ].map((s, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: i < 4 ? "1px solid #f8faff" : "none", opacity: s.done ? .5 : 1 }}>
@@ -2642,10 +2651,10 @@ function ClientApp() {
 
               <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden", border: "1px solid #f1f5f9" }}>
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f8faff" }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#1e293b" }}>Message Brandon</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#1e293b" }}>Message CCE</span>
                 </div>
                 <div style={{ padding: "14px 16px" }}>
-                  <textarea placeholder="Have a question or update for Brandon?" style={{ width: "100%", height: 80, border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontFamily: "inherit", color: "#1e293b", resize: "none", background: "#fafafa" }} />
+                  <textarea placeholder="Have a question or update for CCE?" style={{ width: "100%", height: 80, border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontFamily: "inherit", color: "#1e293b", resize: "none", background: "#fafafa" }} />
                   <button style={{ marginTop: 8, width: "100%", height: 42, borderRadius: 10, background: "#1e3a8a", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Send Message</button>
                 </div>
               </div>
@@ -2658,7 +2667,7 @@ function ClientApp() {
 }
 
 // ============================================================
-// BRANDON ADMIN DASHBOARD  (hidden — shown only at /admin)
+// CCE ADMIN DASHBOARD  (hidden — shown only at /admin)
 // ============================================================
 function AdminDashboard() {
   const [session, setSession] = useState(null);
@@ -2833,7 +2842,7 @@ function AdminDashboard() {
   </div>;
 }
 
-// Route: /admin shows Brandon's dashboard; everything else is the client agent.
+// Route: /admin shows the CCE admin dashboard; everything else is the client agent.
 export default function Root() {
   const path = typeof window !== "undefined" ? window.location.pathname : "/";
   if (path.replace(/\/$/, "").endsWith("/admin")) return <AdminDashboard />;
