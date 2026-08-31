@@ -40,6 +40,8 @@ Every reply asks for exactly ONE thing. Never combine two asks in a single messa
 
 Before every turn the app gives you an APP-VERIFIED DOCUMENT STATE block. It is the truth about what has actually been uploaded and it OUTRANKS your own memory and anything you said earlier. Ask only for the single item it names under THE ONE THING TO ASK FOR THIS TURN. Never ask for anything it lists as RECEIVED, and never tell the client something is "still needed" when it is listed as RECEIVED.
 
+IF THE CLIENT DOES NOT HAVE A DOCUMENT YET: never trap them on one step. If they say they only have a paper copy, will send it later, or do not have it right now, accept that, tell them plainly that the item is still needed before the packet can be mailed, and move on to the next thing you can make progress on — the identity-theft question, or which items they want to dispute. They can upload the outstanding item any time before the packet is built. Never repeat the same request after they have told you they cannot supply it yet.
+
 DOCUMENT ORDER (the app enforces this — follow it):
 1. Credit report  2. Government photo ID  3. Social Security card  4. Proof of current address
 Then the identity-theft question. If the client says yes, the FTC identity theft report comes next and the affidavit comes last — the app opens the upload box and the affidavit form by itself at the right moment. Do NOT jump ahead to the affidavit while documents are still missing, and do NOT let the remaining document list fall off once the identity-theft path opens. If you asked for documents and the client then uploads the FTC report, your next reply still asks for the next missing document.
@@ -81,7 +83,8 @@ The name on the credit report is not always the name the client wants used (for 
 DOCUMENT PREP RULES:
 - Photo ID: show the photo and all four corners, legible, no glare/dark spots — bureaus reject cropped corners.
 - Social Security card: show all four corners AND the signature on the front. Both the corners and the signature must be visible.
-- Proof of address: no signature is needed. It must clearly show the client's name and current address. The DATE must be cropped out or covered — it must NOT be visible. A utility bill or bank statement works.
+- Proof of address: no signature is needed. It must clearly show the client's name and current address. Any issue/statement DATE must be cropped out or covered. A utility bill or bank statement works.
+- JUDGING THE DATE ON A PROOF OF ADDRESS: only flag a date if you can actually read specific date VALUES — digits, or a month name with a number, such as 03/14/2026 or March 14, 2026. The printed WORD "date", "Date:", "Statement Date" or "Billing Date" with nothing filled in beside it is a form label, NOT a date, and you must not flag it. If you are unsure whether a real date is visible, accept the document and say nothing — do not send the client away to re-crop a document that is already fine.
 - Highlighter: yellow or blue only. Never pink (shows as redacted black on TransUnion).
 - Dates always with separators: 01/15/2025 or January 15th 2025 — never 01152025.
 - If no SSN card: W-2, 1099, pay stub, bank loan docs, 1040, or SSA letter can substitute.
@@ -220,6 +223,7 @@ CONVERSATION RULES:
 - TONE: precise, clear, professional. Short plain sentences. No emojis, no hype.
 - NO MARKDOWN. No asterisks, bold, or headings — they render literally. Plain sentences; if you must list, use a simple hyphen.
 - Keep replies brief: one line confirming what you received, then the single next step.
+- YOUR VERY FIRST REPLY of a new intake is the one exception to the one-ask rule. Before asking for anything, list everything the client will need so they can gather it in one sitting instead of being sent away four separate times: the credit report, a government photo ID, their Social Security card, and a proof of current address with the date covered. Add that if any item on their report was opened or used without their authorization, they will also file their own report at IdentityTheft.gov and will need its reference number for the affidavit. Then ask for the credit report only. Do not repeat this list on later turns.
 - Use the client's first name once known. Ask ONE thing at a time — never two.
 - NEVER say you cannot generate a PDF and never give manual PDF steps. To finish, OUTPUT THE PACKAGE_READY BLOCK.
 - NEVER ask the client to type their SSN, DOB, name, or address — read these from documents.
@@ -526,6 +530,39 @@ const GUIDE = [
   { phase: "Phase 3", color: "#0F172A", title: "Build to 800+ Club", body: "Six factors to optimize:\n• Payment history: 100% on time\n• Utilization: 0-3%\n• Derogatory remarks: 0\n• Credit age: 9+ years\n• Total accounts: 21+\n• Inquiries: low\n\nAuthorized-user tradelines (clean, aged, low utilization, reports all 3 bureaus) help credit age, utilization, and account count. Good issuers: Chase, BofA, Capital One, Discover, Elan, Barclays. Avoid Citibank (often 2 bureaus).\n\nMass apply only at 800+: 4-5 cards at a time. 780+ gets the best rates." },
 ];
 
+// MyScoreIQ and IdentityIQ hand the client an HTML file, not a PDF. Sent raw it is many
+// times larger than the same report as a PDF — mostly markup, styling and scripts — and
+// it blew the request limit, so the agent gave up and asked the client to type out every
+// negative account by hand. Converting it to a PDF fixed it every time, so the app now
+// does that conversion itself instead of asking the client to find a converter.
+export function isHtmlFile(f) {
+  if (!f) return false;
+  const n = String(f.name || "").toLowerCase();
+  return /html?$|\.mhtml$/.test(n) || String(f.type || "").includes("html");
+}
+
+// Strip an HTML credit report down to the text a reader actually needs. Scripts, styles,
+// images and navigation carry none of the report's meaning and are the bulk of the bytes.
+export function htmlToLines(html) {
+  let t = String(html || "");
+  t = t.replace(/<script[\s\S]*?<\/script>/gi, " ")
+       .replace(/<style[\s\S]*?<\/style>/gi, " ")
+       .replace(/<head[\s\S]*?<\/head>/gi, " ")
+       .replace(/<!--[\s\S]*?-->/g, " ");
+  // Table and block boundaries carry the report's structure — keep them as separators so
+  // "CAPITAL ONE" and its date do not run together into one unreadable string.
+  t = t.replace(/<\/(td|th)>/gi, "\t")
+       .replace(/<\/(tr|div|p|h[1-6]|li|table|section)>/gi, "\n")
+       .replace(/<br\s*\/?>/gi, "\n")
+       .replace(/<[^>]+>/g, " ");
+  const ent = { "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&apos;": "'" };
+  t = t.replace(/&nbsp;|&amp;|&lt;|&gt;|&quot;|&#39;|&apos;/g, m => ent[m]);
+  t = t.replace(/&#(\d+);/g, (_, d) => { try { return String.fromCharCode(+d); } catch { return " "; } });
+  return t.split("\n")
+    .map(l => l.replace(/\t+/g, "  ").replace(/[ \u00a0]+/g, " ").trim())
+    .filter(l => l.length > 0);
+}
+
 // The affidavit prints the street on one line and City / State / ZIP / Country on the
 // line below it. Anything we already hold is one combined string, so split it before it
 // is offered back to the client — never print a whole address onto the street line.
@@ -644,6 +681,21 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
         <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>Identity Theft Affidavit</div>
         <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.55, marginBottom: 10 }}>Fill this in yourself. Your answers print onto the official FTC form for you to sign and notarize. Only include what you personally know to be true — this is sworn under penalty of perjury.</div>
 
+        <div style={{ background: "#f8faff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#1e3a8a", marginBottom: 6 }}>Have these ready before you start</div>
+          <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.65 }}>
+            Your full legal name, date of birth, and Social Security number. Your driver's license or state ID — issuing state and number. Your current address and roughly how long you have lived there. An email, a daytime phone, and an evening phone. The specific accounts and inquiries you are disputing. Your FTC report number from IdentityTheft.gov.
+          </div>
+          <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.6, marginTop: 8 }}>
+            These should match the ID documents you uploaded. If a detail differs from your ID, use what is true today and mention the difference in section (15).
+          </div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#1e3a8a", margin: "12px 0 6px" }}>Not sure how to fill out the FTC report?</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <a href="https://www.loom.com/share/b99a8aaa0dbd4aaf80ead67441e69dab" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "#1e3a8a", background: "#fff", border: "1.5px solid #dbeafe", borderRadius: 8, padding: "7px 12px", textDecoration: "none" }}>Part 1 — accounts</a>
+            <a href="https://www.loom.com/share/f21a3747f8824d199d6688f500f0a022" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "#1e3a8a", background: "#fff", border: "1.5px solid #dbeafe", borderRadius: 8, padding: "7px 12px", textDecoration: "none" }}>Part 2 — inquiries</a>
+          </div>
+        </div>
+
         <label style={lab}>Full legal name</label><input style={inp} value={f.fullName} onChange={e => set("fullName", e.target.value)} />
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{ flex: 1 }}><label style={lab}>Date of birth</label><input style={inp} placeholder="mm/dd/yyyy" value={f.dob} onChange={e => set("dob", e.target.value)} /></div>
@@ -707,6 +759,9 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
         )}
 
         <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
+        <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.6, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
+          These three are sworn statements, so answer them for your own situation. For a genuine identity theft victim they are normally "I did not" for (11), "I did not" for (12), and "I am" for (13) — but choose what is actually true for you. Nothing here is pre-selected.
+        </div>
         <label style={lab}>(11) Did you authorize anyone to use your information?</label>
         {seg({ get: f.d11, set: v => set("d11", v) }, [["did", "I did"], ["didnot", "I did not"]])}
         <label style={lab}>(12) Did you receive money/goods/services from it?</label>
@@ -848,6 +903,9 @@ function ClientApp() {
   // updates land a render later, and the API call that carries "what do we still need"
   // often goes out in the same tick as an upload — that lag is exactly why the agent kept
   // re-asking for a document the client had just attached.
+  // Documents the client has said they cannot supply right now. The sequencer stops
+  // asking for these and moves on; they are still required before the packet is mailed.
+  const deferredRef  = useRef({});
   const busyRef      = useRef(false);
   const uploadsRef   = useRef([]);
   const slotsRef     = useRef({});
@@ -881,6 +939,10 @@ function ClientApp() {
   // sure the "ready" message is announced only once.
   const [idTheftStarted, setIdTheftStarted] = useState(false);
   const [announcedReady, setAnnouncedReady] = useState(false);
+  // Some members would rather print the cover letter and sign it than copy it by hand.
+  // "handwrite" keeps the blank page for them to write on; "print" replaces that page
+  // with the typed letter and a signature line.
+  const [letterMode, setLetterMode] = useState("handwrite");
 
   useEffect(() => { busyRef.current = busy; }, [busy]);
 
@@ -1003,6 +1065,7 @@ function ClientApp() {
           if (s.affidavitData) { affidavitRef.current = s.affidavitData; setAffidavitData(s.affidavitData); }
           if (s.idTheftStarted) { idTheftRef.current = true; setIdTheftStarted(true); }
           if (s.announcedReady) setAnnouncedReady(true);
+          if (s.letterMode) setLetterMode(s.letterMode);
           didRestore = true;
         }
       }
@@ -1052,7 +1115,7 @@ function ClientApp() {
   // Autosave progress so a client can close the tab and resume where they left off.
   useEffect(() => {
     if (!restored) return;
-    const snap = { v: 2, ts: Date.now(), messages, history, profile: profileRef.current, pkg, slots, docFiles, uploads, progress, statusTxt, approved, clientId, affidavitData, idTheftStarted, announcedReady };
+    const snap = { v: 2, ts: Date.now(), messages, history, profile: profileRef.current, pkg, slots, docFiles, uploads, progress, statusTxt, approved, clientId, affidavitData, idTheftStarted, announcedReady, letterMode };
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
     } catch {
@@ -1074,8 +1137,10 @@ function ClientApp() {
     setClientId(null); setProfile(null); profileRef.current = null; setDocTab("equifax"); setTab(0);
     setAffidavitData(null); affidavitRef.current = null; setShowAffidavit(false);
     slotsRef.current = {};
+    deferredRef.current = {};
     clearAffidavitDraft();
     setIdTheftStarted(false); idTheftRef.current = false; setAnnouncedReady(false);
+    setLetterMode("handwrite");
     initAgent();
   }
 
@@ -1111,7 +1176,8 @@ function ClientApp() {
     const aff = affidavitRef.current;
     const affDone = !!(aff && aff.completed);
     if (affDone) have.push("Identity Theft Affidavit (completed in the app)");
-    const miss = missingDocs(s, prof).map(d => d.label);
+    const missAll = missingDocs(s, prof);
+    const miss = missAll.filter(d => !(deferredRef.current || {})[d.key]).map(d => d.label);
     const theft = !!idTheftRef.current;
     let next;
     if (miss.length) next = miss[0];
@@ -1124,6 +1190,10 @@ function ClientApp() {
       "═══════════════════════════════════════════",
       "RECEIVED (never ask for these again): " + (have.length ? have.join(", ") : "nothing yet"),
       "STILL MISSING: " + (miss.length ? miss.join(", ") : "none of the four required documents"),
+      "CLIENT CANNOT SUPPLY YET (do not keep asking; still required before mailing): " +
+        (Object.keys(deferredRef.current || {}).length
+          ? REQUIRED_DOCS.filter(d => (deferredRef.current || {})[d.key]).map(d => d.label).join(", ")
+          : "nothing"),
       "IDENTITY THEFT PATH: " + (theft ? "ACTIVE" : "not indicated by the client"),
       "AFFIDAVIT: " + (affDone ? "COMPLETE" : theft ? "PENDING" : "not required"),
       "THE ONE THING TO ASK FOR THIS TURN: " + next,
@@ -1315,6 +1385,12 @@ function ClientApp() {
     if (turns === 1) setStatusTxt("Collecting personal info");
     else if (turns === 3) setStatusTxt("Reviewing items to dispute");
     else if (turns >= 5) setStatusTxt("Reviewing your documents");
+    // "I only have a paper copy", "I'll send it later", "I don't have that right now" —
+    // a member got stuck here with no way past. Mark the item pending and keep going.
+    if (/\b(paper copy|don'?t have|do not have|later|not right now|can'?t (get|send|upload)|cannot (get|send|upload)|move on|skip)\b/i.test(text)) {
+      const outstanding = missingDocs(slotsRef.current || {}, profileRef.current);
+      if (outstanding.length) deferDoc(outstanding[0].key);
+    }
     const wantsPkg = !pkg && /\b(generate|pdf|pdfs|package|packages|build|create|finish|finaliz|download)\b/i.test(text);
     const histForApi = wantsPkg
       ? [...history, { role: "user", content: text + "\n\n(System: All required client info and documents are collected and the client has identified the items to dispute. Output the PACKAGE_READY block now — the JSON block that builds the three packages. Do NOT reply with prose saying the packages are ready; output the block itself.)" }]
@@ -1352,8 +1428,31 @@ function ClientApp() {
   }
 
   async function handleFiles(fileList) {
-    const all = Array.from(fileList || []);
+    let all = Array.from(fileList || []);
     if (!all.length) return;
+
+    // MyScoreIQ / IdentityIQ reports arrive as HTML. Convert them here so the rest of the
+    // pipeline only ever sees a PDF.
+    const htmls = all.filter(isHtmlFile);
+    if (htmls.length) {
+      setBusy(true);
+      setStatusTxt("Converting your report…");
+      setMessages(prev => [...prev, { from: "agent", text: `${htmls.length === 1 ? htmls[0].name + " is an HTML file" : "Those are HTML files"} — that is how MyScoreIQ and IdentityIQ hand you the report. Converting to PDF so I can read the whole thing.` }]);
+      const converted = [];
+      for (const h of htmls) {
+        try {
+          const { file: pdf, pages } = await htmlFileToPdf(h);
+          converted.push(pdf);
+          console.log("converted", h.name, "->", pdf.name, pages, "pages");
+        } catch (err) {
+          console.error("html convert failed:", err.message);
+          setMessages(prev => [...prev, { from: "agent", text: `I could not convert ${h.name} automatically. Open it in your browser, choose Print, then "Save as PDF", and upload that file instead.` }]);
+        }
+      }
+      all = all.filter(f => !isHtmlFile(f)).concat(converted);
+      setBusy(false);
+      if (!all.length) return;
+    }
 
     // Skip anything already on file. Stephen re-sent all four documents after a failed
     // build and ended up with 8 uploads and duplicate pages in the packet.
@@ -1553,6 +1652,10 @@ function ClientApp() {
   // next thing and asks for it. Order is fixed: the four required documents, then the FTC
   // report, then the affidavit. This is what stops the affidavit jumping ahead of the ID
   // documents and stops the document list falling off once identity theft is raised.
+  function deferDoc(key) {
+    deferredRef.current = { ...(deferredRef.current || {}), [key]: true };
+  }
+
   function advanceIntake(prefix, tries = 0) {
     // A client can attach the FTC report while the agent is still reading their last
     // upload. generatePackages and sendProgrammatic both no-op when busy, so the next
@@ -1561,7 +1664,10 @@ function ClientApp() {
       if (tries < 40) { setTimeout(() => advanceIntake(prefix, tries + 1), 500); return; }
     }
     const s = slotsRef.current || {};
-    const miss = missingDocs(s, profileRef.current);
+    const all = missingDocs(s, profileRef.current);
+    // Skip anything the client told us they cannot send yet, so they are never stuck on
+    // one step; it stays on the outstanding list for the packet.
+    const miss = all.filter(d => !(deferredRef.current || {})[d.key]);
     const ftcIn = ftcReportReceived(s, profileRef.current);
     const aff = affidavitRef.current;
     const affDone = !!(aff && aff.completed);
@@ -1584,11 +1690,15 @@ function ClientApp() {
       surfaceAffidavitForm(lead + "Everything else is in. The last step is the affidavit below. Fill it out in your own words and list only the items you personally know were opened or used without your authorization. You will print, sign, and notarize it yourself.");
       return;
     }
+    const stillOwed = all.filter(d => (deferredRef.current || {})[d.key]).map(d => d.label);
+    const owedNote = stillOwed.length
+      ? ` Remember, your packet cannot be mailed until you send ${stillOwed.join(" and ")} — upload it here whenever you have it.`
+      : "";
     const prof = profileRef.current || {};
     const di = prof.disputeItems || {};
     const chose = ["equifax", "experian", "transunion"].some(k => (di[k] || []).length > 0);
-    if (chose && !pkg) { if (lead) pushAgentText(lead.trim()); setTimeout(() => generatePackages(), 300); return; }
-    if (lead) pushAgentText(lead.trim());
+    if (chose && !pkg) { if (lead || owedNote) pushAgentText((lead + owedNote).trim()); setTimeout(() => generatePackages(), 300); return; }
+    if (lead || owedNote) pushAgentText((lead + owedNote).trim());
     setTimeout(() => sendProgrammatic("That is everything on my end — all of my documents are uploaded."), 400);
   }
 
@@ -1792,16 +1902,56 @@ function ClientApp() {
       });
     };
 
-    // Page 1 — intentionally blank for the client's handwritten cover letter.
-    doc.setFont("times", "italic"); doc.setFontSize(9); doc.setTextColor("#cbd5e1");
-    doc.text("Handwrite your cover letter on this page.", M, M);
-    doc.setTextColor("#111111");
+    // Page 1. In handwrite mode this sheet is left completely blank for the client to
+    // copy the letter onto — no watermark or instruction is printed, because anything
+    // printed here goes to the bureau and made the packet look like a template.
+    // In print mode the same page carries the typed letter with a signature line.
+    if (letterMode === "print") {
+      para(buildCoverLetterText(bureauKey));
+      y += 8;
+      if (y + 60 > H - M) { doc.addPage(); y = M + 12; }
+      doc.setDrawColor("#111111"); doc.setLineWidth(0.6);
+      doc.line(M, y + 26, M + 240, y + 26);
+      doc.setFont("times", "normal"); doc.setFontSize(10); doc.setTextColor("#111111");
+      doc.text("Signature", M, y + 38);
+      doc.text("Date: ______________________", M + 280, y + 38);
+    }
 
-    // Page 2 — the cover letter, rendered as a plain business letter (no branding).
-    doc.addPage(); y = M + 12;
-    para(buildCoverLetterText(bureauKey));
+    // Page 2 — the typed cover letter, as a plain business letter (no branding). In print
+    // mode page 1 already carries it, so this copy is skipped.
+    if (letterMode !== "print") { doc.addPage(); y = M + 12; para(buildCoverLetterText(bureauKey)); }
     if (pkg.personalInfoNeeded) { doc.addPage(); y = M + 12; para(buildPersonalInfoText(bureauKey)); }
     return doc;
+  }
+
+  // Turn an HTML credit report into a proper PDF, in the browser, before it is read or
+  // attached. The client never has to find a converter — this is the step Stephen was
+  // doing by hand to get IdentityIQ reports through.
+  async function htmlFileToPdf(file) {
+    const raw = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = ev => res(String(ev.target.result || ""));
+      r.onerror = () => rej(new Error("could not read file"));
+      r.readAsText(file);
+    });
+    const lines = htmlToLines(raw);
+    if (!lines.length) throw new Error("no readable text in that file");
+    const JsPDF = await loadJsPDF();
+    const doc = new JsPDF({ unit: "pt", format: "letter" });
+    const M = 40, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    const maxW = W - M * 2, lh = 11;
+    let y = M;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor("#111111");
+    for (const line of lines) {
+      for (const seg of doc.splitTextToSize(line, maxW)) {
+        if (y + lh > H - M) { doc.addPage(); y = M; }
+        doc.text(seg, M, y); y += lh;
+      }
+    }
+    const bytes = doc.output("arraybuffer");
+    const name = String(file.name || "credit-report").replace(/\.[^.]*$/, "") + ".pdf";
+    const out = new File([bytes], name, { type: "application/pdf" });
+    return { file: out, pages: doc.internal.getNumberOfPages() };
   }
 
   // The standard FCRA 605B law page that closes every packet.
@@ -2105,7 +2255,12 @@ function ClientApp() {
   function setSlotFile(category, file) {
     if (!file) return;
     const r = new FileReader();
-    r.onload = ev => updateSlots(prev => ({ ...prev, [category]: { name: file.name, type: file.type, dataUrl: ev.target.result } }));
+    r.onload = ev => {
+      if (deferredRef.current && deferredRef.current[category]) {
+        const d = { ...deferredRef.current }; delete d[category]; deferredRef.current = d;
+      }
+      updateSlots(prev => ({ ...prev, [category]: { name: file.name, type: file.type, dataUrl: ev.target.result } }));
+    };
     r.readAsDataURL(file);
   }
 
@@ -2249,11 +2404,11 @@ function ClientApp() {
                 onDragLeave={e => { e.preventDefault(); if (e.currentTarget === e.target) setDragActive(false); }}
                 onDrop={e => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files); }}
                 style={{ border: `1.5px dashed ${dragActive ? "#1e3a8a" : "#e2e8f0"}`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", background: dragActive ? "#f0f5ff" : "#fff", transition: "all .15s" }}>
-                <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
+                <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.html,.htm,.mhtml" onChange={e => { handleFiles(e.target.files); e.target.value = ""; }} style={{ display: "none" }} />
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: "#f8faff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#1e3a8a", flexShrink: 0 }}>+</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{dragActive ? "Drop your files here" : "Upload or drag documents here"}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>Drop them all at once or one at a time — credit report, ID, SSN card, proof of address. The agent reads everything automatically.</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>Drop them all at once or one at a time — credit report (PDF or the HTML file from MyScoreIQ/IdentityIQ), photo ID, SSN card, proof of address. The agent reads everything automatically.</div>
                 </div>
                 {uploads.length > 0 && <div style={{ background: "#dcfce7", color: "#16a34a", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, flexShrink: 0 }}>{uploads.length} uploaded</div>}
               </div>
@@ -2410,8 +2565,22 @@ function ClientApp() {
                     </div>
                   ) : docTab === "handwrittenNote" ? (
                     <div style={{ padding: "20px 18px" }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Your Handwritten Cover Letters</div>
-                      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14, lineHeight: 1.6 }}>Write a separate letter by hand for each bureau, word for word, on plain white paper in blue or black pen. Each bureau's letter has its own address and items — they are not the same.</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Your Cover Letters</div>
+                      <div style={{ background: "#f8faff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, color: "#1e3a8a", marginBottom: 8 }}>How do you want to send your cover letter?</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {[["handwrite", "Handwrite it"], ["print", "Print and sign it"]].map(([v, label]) => (
+                            <button key={v} onClick={() => setLetterMode(v)} style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${letterMode === v ? "#1e3a8a" : "#e2e8f0"}`, background: letterMode === v ? "#1e3a8a" : "#fff", color: letterMode === v ? "#fff" : "#475569", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.6, marginTop: 8 }}>
+                          {letterMode === "print"
+                            ? "Your packet will include the typed letter with a signature line. Print it, sign and date it by hand in blue or black ink, and mail it."
+                            : "Your packet starts with a blank sheet. Copy the letter below onto it by hand in blue or black ink. Handwriting shows the bureau this is a personal request, not a printed template."}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.6, marginTop: 6 }}>Re-download your packets after changing this so the PDFs match your choice.</div>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14, lineHeight: 1.6 }}>Each bureau gets its own letter — they have different addresses and different items, so they are not interchangeable.</div>
                       <div style={{ background: "#fdf4ff", border: "1px solid #e9d5ff", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".5px" }}>Important Instructions</div>
                         <div style={{ fontSize: 12, color: "#6b21a8", lineHeight: 1.65 }}>{pkg?.handwrittenNote || "Write these letters by hand. Do not type or print them. Use plain white paper and blue or black ink."}</div>
