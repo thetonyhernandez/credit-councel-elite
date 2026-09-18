@@ -165,7 +165,7 @@ TransUnion: TransUnion Consumer Solutions, P.O. Box 2000, Chester, PA 19016-2000
 
 THE AFFIDAVIT:
 Do NOT fill out the Identity Theft Affidavit and do NOT decide which items go on it. The client completes it themselves and chooses which items, if any, they personally know were unauthorized.
-WHEN TO ASK (sequence): Once the client has provided the credit report, photo ID, Social Security card, and proof of address, and you have identified and listed the negative items and the client has confirmed your list, then — before building the package — ask one plain question: "Were any of these items opened or used without your authorization — that is, identity theft? If so, I'll have you complete the FTC affidavit right here. If not, we'll dispute them as inaccurate." Do not build the package in the same turn as this question.
+WHEN TO ASK (sequence): The APP asks this question itself, once, with Yes/No buttons, as soon as the documents are in and the client has chosen their items. You do NOT need to ask it and you must not ask it twice. If the client raises identity theft on their own before then, treat the path as active. Never answer this question for the client, never assume the answer, and never suggest which answer to give — an item is only identity theft if the client says it is.
 IN-CHAT IDENTITY-THEFT STEPS: When the client answers that one or more items WERE identity theft, in your next reply:
 - Briefly tell them to file their own report at IdentityTheft.gov, then output the token FTC_REPORT_STEP on its own line (an upload box for the report they create).
 - The affidavit form is opened by the app itself, once the four required documents AND the FTC report are in. Output the token AFFIDAVIT_STEP only when the app state names the affidavit as the one thing to ask for this turn.
@@ -563,6 +563,38 @@ export function htmlToLines(html) {
     .filter(l => l.length > 0);
 }
 
+// Credit reports run 90+ pages but a bureau packet only needs the personal information,
+// the inquiries and the negative accounts. Parse a human page selection — "1-3, 12, 45-48"
+// — into zero-based page indices, so the client can trim in the app instead of exporting
+// to an outside PDF editor.
+export function parsePageRanges(spec, pageCount) {
+  const out = [];
+  const seen = new Set();
+  const bad = [];
+  String(spec || "").split(/[,\n]/).forEach(part => {
+    const t = part.trim();
+    if (!t) return;
+    const m = t.match(/^(\d+)\s*(?:-|–|—|to)\s*(\d+)$/i);
+    if (m) {
+      let a = parseInt(m[1], 10), b = parseInt(m[2], 10);
+      if (a > b) { const tmp = a; a = b; b = tmp; }
+      for (let i = a; i <= b; i++) {
+        if (i >= 1 && i <= pageCount) { if (!seen.has(i)) { seen.add(i); out.push(i - 1); } }
+        else bad.push(String(i));
+      }
+      return;
+    }
+    if (/^\d+$/.test(t)) {
+      const n = parseInt(t, 10);
+      if (n >= 1 && n <= pageCount) { if (!seen.has(n)) { seen.add(n); out.push(n - 1); } }
+      else bad.push(t);
+      return;
+    }
+    bad.push(t);
+  });
+  return { pages: out, invalid: bad };
+}
+
 // The affidavit prints the street on one line and City / State / ZIP / Country on the
 // line below it. Anything we already hold is one combined string, so split it before it
 // is offered back to the client — never print a whole address onto the street line.
@@ -906,6 +938,12 @@ function ClientApp() {
   // Documents the client has said they cannot supply right now. The sequencer stops
   // asking for these and moves on; they are still required before the packet is mailed.
   const deferredRef  = useRef({});
+  // Whether the client has been ASKED the identity-theft question, and what they said.
+  // It used to depend on the model volunteering the question — so a genuine victim who
+  // was never asked silently ended up on a Section 611 accuracy dispute. The app now asks
+  // every client itself, exactly once, and the client's own answer decides the route.
+  const theftAskedRef = useRef(false);
+  const [theftAnswer, setTheftAnswer] = useState(null);
   const busyRef      = useRef(false);
   const uploadsRef   = useRef([]);
   const slotsRef     = useRef({});
@@ -943,6 +981,13 @@ function ClientApp() {
   // "handwrite" keeps the blank page for them to write on; "print" replaces that page
   // with the typed letter and a signature line.
   const [letterMode, setLetterMode] = useState("handwrite");
+  // Credit report trimming: page count of the uploaded PDF, the client's selection, and
+  // a snapshot of the untrimmed file so a bad trim can always be undone.
+  const [reportPages, setReportPages] = useState(0);
+  const [pageSpec, setPageSpec] = useState("");
+  const [trimMsg, setTrimMsg] = useState("");
+  const [trimBusy, setTrimBusy] = useState(false);
+  const originalReportRef = useRef(null);
 
   useEffect(() => { busyRef.current = busy; }, [busy]);
 
@@ -1066,6 +1111,7 @@ function ClientApp() {
           if (s.idTheftStarted) { idTheftRef.current = true; setIdTheftStarted(true); }
           if (s.announcedReady) setAnnouncedReady(true);
           if (s.letterMode) setLetterMode(s.letterMode);
+          if (s.theftAnswer) { setTheftAnswer(s.theftAnswer); theftAskedRef.current = true; }
           didRestore = true;
         }
       }
@@ -1115,7 +1161,7 @@ function ClientApp() {
   // Autosave progress so a client can close the tab and resume where they left off.
   useEffect(() => {
     if (!restored) return;
-    const snap = { v: 2, ts: Date.now(), messages, history, profile: profileRef.current, pkg, slots, docFiles, uploads, progress, statusTxt, approved, clientId, affidavitData, idTheftStarted, announcedReady, letterMode };
+    const snap = { v: 2, ts: Date.now(), messages, history, profile: profileRef.current, pkg, slots, docFiles, uploads, progress, statusTxt, approved, clientId, affidavitData, idTheftStarted, announcedReady, letterMode, theftAnswer };
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
     } catch {
@@ -1141,6 +1187,8 @@ function ClientApp() {
     clearAffidavitDraft();
     setIdTheftStarted(false); idTheftRef.current = false; setAnnouncedReady(false);
     setLetterMode("handwrite");
+    theftAskedRef.current = false; setTheftAnswer(null);
+    originalReportRef.current = null; setReportPages(0); setPageSpec(""); setTrimMsg("");
     initAgent();
   }
 
@@ -1652,6 +1700,34 @@ function ClientApp() {
   // next thing and asks for it. Order is fixed: the four required documents, then the FTC
   // report, then the affidavit. This is what stops the affidavit jumping ahead of the ID
   // documents and stops the document list falling off once identity theft is raised.
+  // Put the identity-theft question in the chat as a card with two buttons. Asked once.
+  function askTheftQuestion() {
+    if (theftAskedRef.current) return false;
+    theftAskedRef.current = true;
+    setTab(0);
+    setMessages(prev => prev.some(m => m.from === "theft_question") ? prev : [...prev, { from: "theft_question" }]);
+    return true;
+  }
+
+  // The client's own answer. This is the only thing that routes a packet to 605B, and it
+  // is their statement, not ours — the app never decides an item was identity theft.
+  function answerTheft(isVictim) {
+    setTheftAnswer(isVictim ? "yes" : "no");
+    setMessages(prev => prev.map(m => m.from === "theft_question"
+      ? { from: "user", text: isVictim
+          ? "Yes — some of these items were opened or used without my authorization."
+          : "No — none of these were identity theft. They are inaccurate or not mine." }
+      : m));
+    if (isVictim) {
+      markIdTheft();
+      setHistory(prev => [...prev, { role: "user", content: "I am a victim of identity theft. One or more of the items I am disputing were opened or used without my authorization." }]);
+      setTimeout(() => advanceIntake("Understood. Because these were unauthorized, your letters will request a block under FCRA Section 605B and your packet needs your own FTC identity theft report and the affidavit."), 400);
+    } else {
+      setHistory(prev => [...prev, { role: "user", content: "None of these items were identity theft — I am disputing them as inaccurate or not belonging to me." }]);
+      setTimeout(() => advanceIntake("Understood. We will dispute these on accuracy grounds under FCRA Section 611. No affidavit is needed."), 400);
+    }
+  }
+
   function deferDoc(key) {
     deferredRef.current = { ...(deferredRef.current || {}), [key]: true };
   }
@@ -1679,6 +1755,14 @@ function ClientApp() {
         ? "\n\nYour packet is not complete to mail until the affidavit is done — I'll bring that back once your documents are in."
         : "";
       pushAgentText(lead + DOC_ASK[miss[0].key] + tail);
+      return;
+    }
+    // Everyone gets asked, once, before anything is built. This is the step that was
+    // missing: without it the route defaulted to 611 for clients who were never asked.
+    if (!theft && !theftAskedRef.current) {
+      if (lead) pushAgentText(lead.trim());
+      pushAgentText("One question before I build your letters. Were any of the items you are disputing opened or used by someone else without your authorization — that is, identity theft? Your answer decides how the letters are written, so answer only what is true for you.");
+      askTheftQuestion();
       return;
     }
     if (theft && !ftcIn) {
@@ -1924,6 +2008,65 @@ function ClientApp() {
     return doc;
   }
 
+  // Count the pages of whatever credit report is currently on file, so the trimmer can
+  // show "90 pages" and validate the client's selection against it.
+  async function countReportPages(slot) {
+    try {
+      if (!slot || slot.type !== "application/pdf") return 0;
+      const PDFLib = await loadPdfLib();
+      const d = await PDFLib.PDFDocument.load(dataURLtoBytes(slot.dataUrl), { ignoreEncryption: true });
+      return d.getPageCount();
+    } catch (e) { console.error("countReportPages:", e.message); return 0; }
+  }
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const n = await countReportPages(slots.creditReport);
+      if (live) setReportPages(n);
+    })();
+    return () => { live = false; };
+  }, [slots.creditReport]);
+
+  // Keep only the pages the client selected. The full report is kept in memory so
+  // "restore" always works; nothing is destroyed.
+  async function trimCreditReport() {
+    const slot = slots.creditReport;
+    if (!slot || trimBusy) return;
+    const { pages, invalid } = parsePageRanges(pageSpec, reportPages);
+    if (invalid.length) { setTrimMsg(`Could not read: ${invalid.join(", ")}. Use page numbers like 1-3, 12, 45-48.`); return; }
+    if (!pages.length) { setTrimMsg("Enter at least one page to keep."); return; }
+    setTrimBusy(true); setTrimMsg("Trimming…");
+    try {
+      const PDFLib = await loadPdfLib();
+      if (!originalReportRef.current) originalReportRef.current = slot;
+      const srcSlot = originalReportRef.current;
+      const src = await PDFLib.PDFDocument.load(dataURLtoBytes(srcSlot.dataUrl), { ignoreEncryption: true });
+      const total = src.getPageCount();
+      const keep = pages.filter(i => i < total);
+      if (!keep.length) { setTrimMsg("Those pages are outside the report."); setTrimBusy(false); return; }
+      const out = await PDFLib.PDFDocument.create();
+      (await out.copyPages(src, keep)).forEach(pg => out.addPage(pg));
+      const bytes = await out.save();
+      let bin = "";
+      const arr = new Uint8Array(bytes);
+      for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
+      const dataUrl = "data:application/pdf;base64," + btoa(bin);
+      updateSlots(prev => ({ ...prev, creditReport: { name: srcSlot.name, type: "application/pdf", dataUrl } }));
+      setTrimMsg(`Kept ${keep.length} of ${total} pages. Re-download your packets so they use the trimmed report.`);
+    } catch (e) {
+      console.error("trimCreditReport:", e.message);
+      setTrimMsg("Could not trim that file: " + e.message);
+    }
+    setTrimBusy(false);
+  }
+
+  function restoreCreditReport() {
+    if (!originalReportRef.current) return;
+    updateSlots(prev => ({ ...prev, creditReport: originalReportRef.current }));
+    setTrimMsg("Full report restored.");
+  }
+
   // Turn an HTML credit report into a proper PDF, in the browser, before it is read or
   // attached. The client never has to find a converter — this is the step Stephen was
   // doing by hand to get IdentityIQ reports through.
@@ -2050,6 +2193,11 @@ function ClientApp() {
         for (const k of ["photoID", "passport", "ssnCard", "proofResidence"]) {
           if (slots[k] && !usedUrls.has(slots[k].dataUrl)) { await appendFile(slots[k]); usedUrls.add(slots[k].dataUrl); }
         }
+        // Anything the app could not classify from its filename goes here, with the other
+        // identification, NOT at the end of the packet. A proof of address photographed as
+        // IMG_1234.png used to fall through to the tail and print after the credit report,
+        // one page before the law page, which is what made the packet order look wrong.
+        for (const f of docFiles) { if (!usedUrls.has(f.dataUrl)) { await appendFile(f); usedUrls.add(f.dataUrl); } }
         // Credit report next.
         if (slots.creditReport && !usedUrls.has(slots.creditReport.dataUrl)) { await appendFile(slots.creditReport); usedUrls.add(slots.creditReport.dataUrl); }
         // Affidavit: client's uploaded copy if present, otherwise the blank official form.
@@ -2059,8 +2207,6 @@ function ClientApp() {
         for (const k of ["ftcReport", "policeReport"]) {
           if (slots[k] && !usedUrls.has(slots[k].dataUrl)) { await appendFile(slots[k]); usedUrls.add(slots[k].dataUrl); }
         }
-        // Anything uploaded in chat that wasn't sorted into a slot, so nothing is dropped.
-        for (const f of docFiles) { if (!usedUrls.has(f.dataUrl)) await appendFile(f); }
       } else {
         for (const f of docFiles) await appendFile(f);
         await appendOfficialAffidavit();
@@ -2360,6 +2506,20 @@ function ClientApp() {
                     <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
                     <FtcUploadCard onUpload={completeFtcUpload} />
                   </div>
+                ) : m.from === "theft_question" ? (
+                  <div key="theft_question" className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
+                    <div style={{ maxWidth: "85%", background: "#fff", border: "1px solid #e9d5ff", borderRadius: "4px 16px 16px 16px", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 6 }}>Were these items identity theft?</div>
+                      <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.6, marginBottom: 12 }}>
+                        Answer yes only if someone opened or used these accounts or inquiries without your authorization. If yes, you will file your own report at IdentityTheft.gov and complete the FTC affidavit, and your letters will request a block under FCRA Section 605B. If no, your letters dispute the items as inaccurate under Section 611.
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button onClick={() => answerTheft(true)} style={{ padding: "10px 16px", background: "#7C3AED", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Yes — this was identity theft</button>
+                        <button onClick={() => answerTheft(false)} style={{ padding: "10px 16px", background: "#fff", color: "#1e3a8a", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>No — dispute as inaccurate</button>
+                      </div>
+                    </div>
+                  </div>
                 ) : m.from === "affidavit_form" ? (
                   <div key="affidavit_form" ref={affidavitFormRef} className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10, scrollMarginTop: 12 }}>
                     <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
@@ -2490,6 +2650,33 @@ function ClientApp() {
                           </label>
                         </div>
                       ))}
+                      {slots.creditReport && (
+                        <div style={{ marginTop: 16, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Trim your credit report</div>
+                          <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6, marginBottom: 10 }}>
+                            {reportPages ? `Your report is ${reportPages} pages.` : "Counting pages…"} The bureaus only need the pages showing your personal information, the inquiries, and the accounts you are disputing. Open the report, note those page numbers, and enter them below — everything else is left out of the packet.
+                          </div>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <input
+                              value={pageSpec}
+                              onChange={e => { setPageSpec(e.target.value); setTrimMsg(""); }}
+                              placeholder="e.g. 1-3, 12, 45-48"
+                              style={{ flex: 2, minWidth: 180, boxSizing: "border-box", padding: "9px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, fontFamily: "inherit" }}
+                            />
+                            <button onClick={trimCreditReport} disabled={trimBusy || !reportPages} style={{ padding: "9px 16px", background: trimBusy || !reportPages ? "#94a3b8" : "#0f766e", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: trimBusy || !reportPages ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                              {trimBusy ? "Trimming…" : "Keep only these pages"}
+                            </button>
+                            {originalReportRef.current && (
+                              <button onClick={restoreCreditReport} style={{ padding: "9px 14px", background: "#fff", color: "#0f766e", border: "1.5px solid #99f6e4", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                Restore full report
+                              </button>
+                            )}
+                          </div>
+                          {trimMsg && <div style={{ fontSize: 12, color: trimMsg.startsWith("Could not") || trimMsg.startsWith("Enter") || trimMsg.startsWith("Those") ? "#dc2626" : "#0f766e", marginTop: 8, lineHeight: 1.5 }}>{trimMsg}</div>}
+                          <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 8, lineHeight: 1.5 }}>The full report is kept, so you can restore it any time. Only PDF reports can be trimmed — an HTML report is converted to PDF automatically when you upload it.</div>
+                        </div>
+                      )}
+
                       <div style={{ marginTop: 16, background: "#f0fdfa", border: "1px solid #99f6e4", borderRadius: 10, padding: "12px 14px", fontSize: 12, color: "#0f766e", lineHeight: 1.6 }}>
                         The FCRA 605B law page is added to every packet automatically — no upload needed. Use the green Download button below to generate each bureau's complete PDF.
                       </div>
