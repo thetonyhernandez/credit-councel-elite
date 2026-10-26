@@ -50,7 +50,7 @@ Then the identity-theft question. If the member says yes, the FTC identity theft
 DISPUTE BASIS — THE APP DECIDES THIS, NOT YOU
 ═══════════════════════════════════════════
 The app builds every cover letter in code. If the member completes the Identity Theft Affidavit in the app AND has an identity theft report on file, the app writes that letter as a Section 605B (15 U.S.C. 1681c-2) BLOCK request for the items THE MEMBER listed on their own affidavit, and keeps Section 611 for everything else. With no affidavit the letter is a Section 611 reinvestigation request only.
-You never choose the basis and you never write 605B language yourself. Never tell a member who has declared identity theft and completed the affidavit that their letters are an accuracy dispute only — 605B and 611 are different requests and the member will notice.
+You never choose the basis and you never write 605B language yourself. If a member says every item they are disputing was unauthorized, tell them to list every one of those items on the affidavit — all of them, not three — because an item that is not on the affidavit is disputed for accuracy under 611 instead of blocked under 605B. Never tell a member who has declared identity theft and completed the affidavit that their letters are an accuracy dispute only — 605B and 611 are different requests and the member will notice.
 
 ═══════════════════════════════════════════
 BRANDON METHODOLOGY
@@ -170,7 +170,7 @@ IN-CHAT IDENTITY-THEFT STEPS: When the member answers that one or more items WER
 - Briefly tell them to file their own report at IdentityTheft.gov, then output the token FTC_REPORT_STEP on its own line (an upload box for the report they create).
 - The affidavit form is opened by the app itself, once the four required documents AND the FTC report are in. Output the token AFFIDAVIT_STEP only when the app state names the affidavit as the one thing to ask for this turn.
 IDENTITY-THEFT PATH IS STICKY: Once the member has said an item was identity theft, both the FTC report AND the affidavit are required parts of their packet. If you still need other documents (photo ID, SSN card, proof of address), keep collecting them ONE AT A TIME — the affidavit does not replace them and must not push them off the list. After the FTC report is uploaded, the app returns to any outstanding documents and then shows the affidavit form automatically — do not tell the member the intake is finished, do not ask "shall I build the packages," and do not output PACKAGE_READY as if everything is done while the affidavit is still outstanding. The letters may be built in parallel, but every reply while the affidavit is incomplete must state plainly that the packet is not complete to mail until the member completes the affidavit. Never imply the case is ready when the affidavit is still open.
-HOW TO GUIDE THE FORM (do this when the app opens the affidavit): explain how to complete it, not what to claim. Tell them: enter your legal name, date of birth, SSN, driver's license, and current address; answer whether your name, address or phone has changed since the fraud, and if it has, enter what they were then; for the three declarations, check only what is true for you; the form asks whether you know who used your information — answer no and skip it if you don't, and enter only what you actually know if you do; the description of how the theft happened should match the personal statement in your own FTC report; the form separates accounts from inquiries and they must not be mixed — section (18) is for hard inquiries only, meaning a company that pulled their credit without authorization, with the company name as it appears on the report and the date of that inquiry, and section (19) is for accounts only, meaning an account opened in their name or an existing account taken over; in each, list ONLY the specific items they personally know were unauthorized — in their own words; then print, sign, and have it notarized. You may explain what each field means. You must NOT tell the member which accounts to list, must NOT suggest that any identified negative is fraud, and must NOT characterize items as identity theft on their behalf. The choice of which items to include is entirely theirs.
+HOW TO GUIDE THE FORM (do this when the app opens the affidavit): explain how to complete it, not what to claim. Tell them: enter your legal name, date of birth, SSN, driver's license, and current address; answer whether your name, address or phone has changed since the fraud, and if it has, enter what they were then; for the three declarations, check only what is true for you; the form asks whether you know who used your information — answer no and skip it if you don't, and enter only what you actually know if you do; the description of how the theft happened should match the personal statement in your own FTC report; the form separates accounts from inquiries and they must not be mixed — section (18) is for hard inquiries only, meaning a company that pulled their credit without authorization, with the company name as it appears on the report and the date of that inquiry, and section (19) is for accounts only, meaning an account opened in their name or an existing account taken over; in each, list ONLY the specific items they personally know were unauthorized — in their own words; there is NO LIMIT on how many they may list, and they must never be told to stop at three or to put the extras in the personal statement — the app prints anything past the third on a continuation sheet attached to the affidavit, and only items entered here are requested for a block under 605B; then print, sign, and have it notarized. You may explain what each field means. You must NOT tell the member which accounts to list, must NOT suggest that any identified negative is fraud, and must NOT characterize items as identity theft on their behalf. The choice of which items to include is entirely theirs.
 Output each token at most once. If the member says none were identity theft (only inaccurate or not theirs), do NOT output the tokens — proceed to build and dispute on accuracy grounds under Section 611.
 
 THE FTC REPORT:
@@ -360,9 +360,40 @@ export function normKey(s) {
 export function affidavitTheftNames(aff) {
   if (!aff || !aff.completed) return [];
   const out = [];
-  (aff.accounts || []).forEach(a => { if (a && a.institution && String(a.institution).trim()) out.push(String(a.institution).trim()); });
-  [aff.company18A, aff.company18B, aff.company18C].forEach(c => { if (c && String(c).trim()) out.push(String(c).trim()); });
+  const add = v => { if (v && String(v).trim()) out.push(String(v).trim()); };
+  // Every account the member listed, however many. This used to stop at three because
+  // the printed FTC form has three blocks — so a member with eight fraudulent accounts
+  // had five of them silently routed to a Section 611 accuracy dispute.
+  (aff.accounts || []).forEach(a => add(a && a.institution));
+  (aff.inquiries || []).forEach(i => add(i && i.company));
+  // Affidavits saved before the inquiry repeater existed kept three fixed fields.
+  [aff.company18A, aff.company18B, aff.company18C].forEach(add);
   return out;
+}
+
+// The member's own free-text sections: how the theft happened (15) and the personal
+// information lines (17). When the printed form ran out of slots members were told to
+// list the remaining items here, so these words are part of what they swore to and a
+// creditor named in them counts as identified.
+export function affidavitStatementText(aff) {
+  if (!aff || !aff.completed) return "";
+  return [aff.crimeInfo, aff.info17A, aff.info17B, aff.info17C]
+    .map(v => (v == null ? "" : String(v)))
+    .join(" \n ");
+}
+
+// Does the member's own statement name this item? The item's creditor is the needle and
+// the statement is the haystack, so nothing is guessed — we only look for a name we
+// already have against words the member typed.
+export function statementNames(item, statement) {
+  const hay = normKey(statement);
+  if (!hay) return false;
+  const name = normKey(String(item || "").split(/[—–-]/)[0]);
+  if (!name || name.length < 3) return false;
+  if (hay.includes(name)) return true;
+  const words = name.split(" ").filter(w => w.length > 2);
+  if (!words.length) return false;
+  return words.every(w => hay.includes(w));
 }
 
 export function matchesTheft(item, names) {
@@ -392,9 +423,13 @@ export function splitDisputeItems(pkg, aff, slots, bureauKey) {
   const items = ((pkg && pkg.disputeItems && pkg.disputeItems[bureauKey]) || []).slice();
   const hasReport = !!(slots && (slots.ftcReport || slots.policeReport));
   const names = affidavitTheftNames(aff);
-  if (!names.length || !hasReport) return { block: [], accuracy: items };
+  const statement = affidavitStatementText(aff);
+  if ((!names.length && !statement.trim()) || !hasReport) return { block: [], accuracy: items };
   const block = [], accuracy = [];
-  items.forEach(it => (matchesTheft(it, names) ? block : accuracy).push(it));
+  // An item is blocked under 605B if the member named it in a structured field OR wrote
+  // it into their own statement. Before this, overflow typed into the statement matched
+  // nothing and fell through to the 611 accuracy paragraph.
+  items.forEach(it => ((matchesTheft(it, names) || statementNames(it, statement)) ? block : accuracy).push(it));
   // Anything the member swore to on their own affidavit that the model never listed for
   // ANY bureau is still theirs to block — carry it across in their own words.
   const allItems = [];
@@ -721,9 +756,23 @@ function FtcUploadCard({ onUpload }) {
 // report. These two components MUST stay at module scope. Declared inside ClientApp they
 // got a new function identity on every parent render, so React unmounted and remounted
 // them and wiped everything the member had typed.
+// A dispute item reads "CREDITOR — TYPE — MM/DD/YYYY". Split it so one tap can prefill
+// an affidavit entry with what the member already identified, instead of retyping it.
+export function parseDisputeItem(raw) {
+  const parts = String(raw || "").split(/\s+[—–-]\s+/).map(x => x.trim()).filter(Boolean);
+  const name = parts[0] || String(raw || "").trim();
+  const rest = parts.slice(1).join(" ");
+  const dm = rest.match(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}[\/.-]\d{4})/);
+  return {
+    name,
+    date: dm ? dm[1] : "",
+    isInquiry: /inquir/i.test(rest),
+  };
+}
+
 const BLANK_ACCT = { institution: "", contact: "", phone: "", extension: "", accountNumber: "", routing: "", checkNumbers: "", type: "", status: "", dateOpened: "", dateDiscovered: "", amount: "" };
 
-function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, onDraft }) {
+function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, onDraft, disputeItems }) {
   // Seed order: an in-progress draft always wins (it is the newest thing the member
   // typed), then previously saved answers when they reopen the form to edit, then the
   // name/address already on file. The draft is what makes an accidental remount or a
@@ -747,7 +796,7 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
       law20: "", ftcNumber: "",
     };
     const src = initial && typeof initial === "object" ? initial : null;
-    if (!src) return { fields: base, accounts: [{ ...BLANK_ACCT }] };
+    if (!src) return { fields: base, accounts: [{ ...BLANK_ACCT }], inquiries: [{ company: "", date: "" }] };
     const fields = { ...base };
     Object.keys(base).forEach(k => { if (src[k] !== undefined && src[k] !== null) fields[k] = src[k]; });
     // An older saved session stored one combined address line; split it on the way back in.
@@ -762,11 +811,20 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
     const accounts = Array.isArray(src.accounts) && src.accounts.length
       ? src.accounts.map(a => ({ ...BLANK_ACCT, ...a }))
       : [{ ...BLANK_ACCT }];
-    return { fields, accounts };
+    // Affidavits saved before the repeater existed kept three fixed inquiry fields;
+    // carry those forward so reopening an older one never loses what was typed.
+    let inquiries = Array.isArray(src.inquiries) && src.inquiries.length
+      ? src.inquiries.map(q => ({ company: "", date: "", ...q }))
+      : [["company18A", "company18ADate"], ["company18B", "company18BDate"], ["company18C", "company18CDate"]]
+          .map(([c, d]) => ({ company: src[c] || "", date: src[d] || "" }))
+          .filter(q => q.company || q.date);
+    if (!inquiries.length) inquiries = [{ company: "", date: "" }];
+    return { fields, accounts, inquiries };
   };
 
   const [f, setF] = useState(() => buildSeed().fields);
   const [accts, setAccts] = useState(() => buildSeed().accounts);
+  const [inqs, setInqs] = useState(() => buildSeed().inquiries);
   const [saved, setSaved] = useState(false);
 
   // Report every keystroke up to the parent, which holds it in a ref and writes it to
@@ -776,13 +834,19 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
   useEffect(() => {
     if (first.current) { first.current = false; return; }
     setSaved(false);
-    if (onDraft) onDraft({ ...f, accounts: accts });
-  }, [f, accts]);
+    if (onDraft) onDraft({ ...f, accounts: accts, inquiries: inqs });
+  }, [f, accts, inqs]);
 
   const blankAcct = BLANK_ACCT;
   const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
   const setAcct = (i, k, v) => setAccts(prev => prev.map((a, idx) => idx === i ? { ...a, [k]: v } : a));
-  const addAcct = () => setAccts(prev => prev.length >= 3 ? prev : [...prev, { ...blankAcct }]);
+  const setInq = (i, k, v) => setInqs(prev => prev.map((a, idx) => idx === i ? { ...a, [k]: v } : a));
+  const addInq = () => setInqs(prev => [...prev, { company: "", date: "" }]);
+  const removeInq = (i) => setInqs(prev => prev.filter((_, idx) => idx !== i));
+  // No cap. The printed FTC form has three account blocks, so anything past the third
+  // prints on a continuation sheet attached to the affidavit — but every item the member
+  // lists here counts toward the 605B block request.
+  const addAcct = () => setAccts(prev => [...prev, { ...blankAcct }]);
   const removeAcct = (i) => setAccts(prev => prev.filter((_, idx) => idx !== i));
 
     const inp = { width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", marginBottom: 8 };
@@ -916,19 +980,60 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
           </div>
         )}
 
+        {Array.isArray(disputeItems) && disputeItems.length > 0 && (
+          <div style={{ background: "#f8faff", border: "1px solid #dbeafe", borderRadius: 10, padding: "12px 14px", marginTop: 8, marginBottom: 4 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#1e3a8a", marginBottom: 4 }}>Items you told us you are disputing</div>
+            <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.6, marginBottom: 10 }}>
+              Tap any that were opened or used without your authorization and it fills in below, where you can check and finish it. Nothing is added until you tap it, and nothing here is pre-selected — only you can say an item was theft.
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {disputeItems.map((raw, i) => {
+                const p = parseDisputeItem(raw);
+                const used = p.isInquiry
+                  ? inqs.some(q => normKey(q.company) && normKey(p.name).includes(normKey(q.company)))
+                  : accts.some(a => normKey(a.institution) && normKey(p.name).includes(normKey(a.institution)));
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={used}
+                    onClick={() => {
+                      if (p.isInquiry) setInqs(prev => {
+                        const open = prev.findIndex(q => !String(q.company || "").trim());
+                        const entry = { company: p.name, date: p.date };
+                        return open >= 0 ? prev.map((q, idx) => idx === open ? entry : q) : [...prev, entry];
+                      });
+                      else setAccts(prev => {
+                        const open = prev.findIndex(a => !String(a.institution || "").trim());
+                        const entry = { ...BLANK_ACCT, institution: p.name, dateOpened: p.date };
+                        return open >= 0 ? prev.map((a, idx) => idx === open ? entry : a) : [...prev, entry];
+                      });
+                    }}
+                    style={{ padding: "7px 11px", borderRadius: 8, border: `1.5px solid ${used ? "#99f6e4" : "#cbd5e1"}`, background: used ? "#f0fdfa" : "#fff", color: used ? "#0f766e" : "#1e293b", fontSize: 11.5, fontWeight: 600, cursor: used ? "default" : "pointer", fontFamily: "inherit" }}
+                  >
+                    {used ? "\u2713 " : "+ "}{p.name}{p.isInquiry ? " (inquiry)" : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
         <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>(18) The inquiries you say are fraud</div>
-        <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Hard inquiries only — a company that pulled your credit without your authorization. Enter the company name exactly as it appears on your report and the date of the inquiry. The official form has room for three; if you have more, list the rest in section (15).</div>
-        {[["A", f.company18A, f.company18ADate], ["B", f.company18B, f.company18BDate], ["C", f.company18C, f.company18CDate]].map(([sfx, name, date]) => (
-          <div key={sfx} style={{ display: "flex", gap: 8 }}>
-            <div style={{ flex: 3 }}><input style={inp} placeholder={sfx === "A" ? "Company name" : "(optional)"} value={name} onChange={e => set("company18" + sfx, e.target.value)} /></div>
-            <div style={{ flex: 1 }}><input style={inp} placeholder="Date mm/dd/yyyy" value={date} onChange={e => set("company18" + sfx + "Date", e.target.value)} /></div>
+        <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Hard inquiries only — a company that pulled your credit without your authorization. Enter the company name exactly as it appears on your report and the date of the inquiry. List every one of them: the printed form has three lines, and any beyond that print on a continuation sheet attached to your affidavit.</div>
+        {inqs.map((q, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <div style={{ flex: 3 }}><input style={inp} placeholder="Company name" value={q.company} onChange={e => setInq(i, "company", e.target.value)} /></div>
+            <div style={{ flex: 1 }}><input style={inp} placeholder="Date mm/dd/yyyy" value={q.date} onChange={e => setInq(i, "date", e.target.value)} /></div>
+            {inqs.length > 1 && <button type="button" onClick={() => removeInq(i)} title="Remove this inquiry" style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 16, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }}>×</button>}
           </div>
         ))}
+        <button type="button" onClick={addInq} style={{ background: "none", border: "1.5px dashed #c4b5fd", color: "#7C3AED", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 4 }}>+ Add another inquiry</button>
 
         <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
         <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b", marginBottom: 2 }}>(19) The accounts you say are fraud</div>
-        <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Accounts only — an account someone opened in your name, or one of your existing accounts they took over. Hard inquiries do not go here; they go in section (18) above.</div>
+        <div style={{ fontSize: 11.5, color: "#94a3b8", lineHeight: 1.5, marginBottom: 8 }}>Accounts only — an account someone opened in your name, or one of your existing accounts they took over. Hard inquiries do not go here; they go in section (18) above. List every account, however many: the printed form holds three, and the rest print on a continuation sheet attached to your affidavit. Do not leave any out.</div>
         {accts.map((a, i) => (
           <div key={i} style={{ border: "1px solid #f1f5f9", borderRadius: 10, padding: 10, marginBottom: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -955,7 +1060,7 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
             <input style={inp} placeholder="Total amount obtained ($)" value={a.amount} onChange={e => setAcct(i, "amount", e.target.value)} />
           </div>
         ))}
-        {accts.length < 3 && <button type="button" onClick={addAcct} style={{ background: "none", border: "1.5px dashed #c4b5fd", color: "#7C3AED", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>+ Add another item</button>}
+        {<button type="button" onClick={addAcct} style={{ background: "none", border: "1.5px dashed #c4b5fd", color: "#7C3AED", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>+ Add another item</button>}
 
         <div style={{ height: 1, background: "#f1f5f9", margin: "8px 0 12px" }} />
         <label style={lab}>(15) How the identity theft happened</label>
@@ -984,7 +1089,13 @@ function AffidavitChatForm({ initial, seedName, seedAddress, seedDob, onDone, on
 
         <button type="button" onClick={() => {
           // If the member turned a section off, nothing from it goes onto the form.
-          const out = { ...f, accounts: accts };
+          const out = { ...f, accounts: accts, inquiries: inqs };
+          // Keep the three legacy fields in step with the repeater so the printed form,
+          // saved sessions and anything reading the old shape all agree.
+          ["A", "B", "C"].forEach((sfx, i) => {
+            out["company18" + sfx] = (inqs[i] && inqs[i].company) || "";
+            out["company18" + sfx + "Date"] = (inqs[i] && inqs[i].date) || "";
+          });
           if (out.changed !== "yes") Object.keys(out).forEach(k => { if (k.startsWith("atFraud")) out[k] = ""; });
           if (out.knowsPerson !== "yes") ["person", "personAddr1", "personApt", "personCity", "personState", "personZip", "personCountry", "personArea1", "personPhone1", "personArea2", "personPhone2", "personInfo"].forEach(k => { out[k] = ""; });
           setSaved(true);
@@ -1451,6 +1562,39 @@ function ClientApp() {
 
   // Has the member actually told us which items to dispute? Without that there is nothing
   // to put in a letter, and it is the ONLY thing worth asking about at this stage.
+  // The union of what the member already told the agent they are disputing, de-duplicated
+  // across bureaus. Offered on the affidavit as one-tap fill so a member with eight items
+  // does not type all eight a third time.
+  function allDisputeItems() {
+    const di = (profileRef.current || {}).disputeItems || {};
+    const out = [], seen = new Set();
+    ["equifax", "experian", "transunion"].forEach(k => {
+      (di[k] || []).forEach(it => {
+        const key = normKey(it);
+        if (!key || seen.has(key)) return;
+        seen.add(key); out.push(String(it));
+      });
+    });
+    return out;
+  }
+
+  // Items the member is disputing that their affidavit does not name. On the identity
+  // theft path these are the ones that would quietly go out under Section 611 — the exact
+  // failure a member hit in beta, where five of eight sworn items landed on the wrong law.
+  function unblockedItems() {
+    if (!pkg) return [];
+    const out = [], seen = new Set();
+    BUREAUS.forEach(b => {
+      const sp = splitDisputeItems(pkg, affidavitData, slots, b.key);
+      sp.accuracy.forEach(it => {
+        const k = normKey(it);
+        if (!k || seen.has(k)) return;
+        seen.add(k); out.push(it);
+      });
+    });
+    return out;
+  }
+
   function hasDisputeSelection() {
     const di = (profileRef.current || {}).disputeItems || {};
     return ["equifax", "experian", "transunion"].some(k => (di[k] || []).length > 0);
@@ -2437,9 +2581,16 @@ function ClientApp() {
     put(2, 110, 532, ans.info17C, 9);
     // Section 18's printed line only labels "Company Name:", but the team needs the date
     // of each inquiry on the form too, so it prints at the right-hand end of the same rule.
-    put(2, 178, 592, ans.company18A, 9); put(2, 395, 592, ans.company18ADate, 9);
-    put(2, 178, 612, ans.company18B, 9); put(2, 395, 612, ans.company18BDate, 9);
-    put(2, 178, 632, ans.company18C, 9); put(2, 395, 632, ans.company18CDate, 9);
+    const inqList = ((ans.inquiries && ans.inquiries.length)
+      ? ans.inquiries
+      : [["company18A", "company18ADate"], ["company18B", "company18BDate"], ["company18C", "company18CDate"]]
+          .map(([c, d]) => ({ company: ans[c], date: ans[d] }))
+    ).filter(q => q && String(q.company || "").trim());
+    [592, 612, 632].forEach((yy, i) => {
+      const q = inqList[i];
+      if (!q) return;
+      put(2, 178, yy, q.company, 9); put(2, 395, yy, q.date, 9);
+    });
 
     // Page 4 (H-4) — fraud account blocks (up to 3), all member-entered
     const blocks = [
@@ -2461,6 +2612,67 @@ function ClientApp() {
     const law = { notfiled: 240, unable: 258, automated: 276, inperson: 306 }[ans.law20];
     if (law) X(4, 103, law);
     put(4, 305, 604, ans.ftcNumber);
+
+    // CONTINUATION SHEET. The printed form has three account blocks and three inquiry
+    // lines. A member with more than that used to have the rest go unrecorded, which is
+    // how items the member had sworn to ended up disputed on accuracy grounds instead.
+    // Everything past the third now prints here, attached to and referenced by the form.
+    const allAccts = (ans.accounts || []).filter(a => a && String(a.institution || "").trim());
+    const extraAccts = allAccts.slice(3);
+    const extraInqs = inqList.slice(3);
+
+    if (extraAccts.length || extraInqs.length) {
+      const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      const bold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+      const W = 612, H = 792, M = 54, LH = 14;
+      let page = doc.addPage([W, H]);
+      let y = H - M;
+      const line = (text, opts) => {
+        const o = opts || {};
+        const f = o.bold ? bold : font;
+        const size = o.size || 10;
+        if (y - LH < M) { page = doc.addPage([W, H]); y = H - M; }
+        page.drawText(String(text == null ? "" : text), { x: M + (o.indent || 0), y, size, font: f });
+        y -= (o.gap || LH);
+      };
+      line("Identity Theft Victim's Complaint and Affidavit — Continuation Sheet", { bold: true, size: 12, gap: 20 });
+      line(`Victim: ${ans.fullName || ""}`, { gap: 12 });
+      line("This sheet is part of and attached to the affidavit above. The items below were", { size: 9, gap: 11 });
+      line("identified by me and continue sections (18) and (19); the printed form has room", { size: 9, gap: 11 });
+      line("for three of each.", { size: 9, gap: 20 });
+
+      if (extraAccts.length) {
+        line("(19) Accounts, continued", { bold: true, size: 11, gap: 16 });
+        extraAccts.forEach((ac, i) => {
+          line(`${i + 4}. ${ac.institution || ""}`, { bold: true, gap: 13 });
+          const bits = [];
+          if (ac.accountNumber) bits.push(`Account no. ${ac.accountNumber}`);
+          if (ac.type) bits.push({ credit: "Credit", bank: "Bank", phoneutil: "Phone/Utilities", loan: "Loan", govbenefits: "Government benefits", internetemail: "Internet or email", other: "Other" }[ac.type] || ac.type);
+          if (ac.status) bits.push(ac.status === "opened" ? "Opened fraudulently" : "Existing account tampered with");
+          if (bits.length) line(bits.join("  ·  "), { size: 9, indent: 14, gap: 12 });
+          const dates = [];
+          if (ac.dateOpened) dates.push(`Opened ${ac.dateOpened}`);
+          if (ac.dateDiscovered) dates.push(`Discovered ${ac.dateDiscovered}`);
+          if (ac.amount) dates.push(`Amount $${ac.amount}`);
+          if (dates.length) line(dates.join("  ·  "), { size: 9, indent: 14, gap: 12 });
+          y -= 4;
+        });
+        y -= 8;
+      }
+
+      if (extraInqs.length) {
+        line("(18) Credit inquiries, continued", { bold: true, size: 11, gap: 16 });
+        extraInqs.forEach((q, i) => {
+          line(`${i + 4}. ${q.company || ""}${q.date ? "   —   " + q.date : ""}`, { gap: 13 });
+        });
+        y -= 8;
+      }
+
+      y -= 10;
+      line("I declare that the information above is true to the best of my knowledge, and that", { size: 9, gap: 11 });
+      line("none of it relates to any transaction made or authorized by me.", { size: 9, gap: 26 });
+      line("Signature: ______________________________        Date: ______________", { size: 10 });
+    }
 
     return await doc.save();
   }
@@ -2613,6 +2825,7 @@ function ClientApp() {
                   <div key="affidavit_form" ref={affidavitFormRef} className="msg" style={{ display: "flex", alignItems: "flex-end", gap: 10, scrollMarginTop: 12 }}>
                     <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#1e3a8a,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>⚖️</div>
                     <AffidavitChatForm
+                      disputeItems={allDisputeItems()}
                       initial={affidavitDraftRef.current || affidavitData}
                       seedName={pkg?.clientName || ""}
                       seedAddress={pkg?.clientAddress || ""}
@@ -2950,11 +3163,38 @@ function ClientApp() {
                         {BUREAUS.map(b => (pkg.disputeItems[b.key]?.length > 0) && (
                           <div key={b.key} style={{ marginBottom: 10 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: b.color, marginBottom: 5 }}>{b.label}</div>
-                            {pkg.disputeItems[b.key].map((item, j) => (
-                              <div key={j} style={{ fontSize: 12, color: "#374151", padding: "3px 0 3px 10px", borderLeft: `2px solid ${b.color}`, marginBottom: 3 }}>{item}</div>
-                            ))}
+                            {pkg.disputeItems[b.key].map((item, j) => {
+                              const sp = splitDisputeItems(pkg, affidavitData, slots, b.key);
+                              const blocked = sp.block.some(x => normKey(x) === normKey(item));
+                              return (
+                                <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#374151", padding: "3px 0 3px 10px", borderLeft: `2px solid ${b.color}`, marginBottom: 3 }}>
+                                  <span style={{ flex: 1 }}>{item}</span>
+                                  {sp.block.length > 0 && (
+                                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 5, background: blocked ? "#f0fdfa" : "#fffbeb", color: blocked ? "#0f766e" : "#b45309", whiteSpace: "nowrap" }}>
+                                      {blocked ? "605B" : "611"}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         ))}
+                        {idTheftStarted && unblockedItems().length > 0 && (
+                          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "12px 14px", marginTop: 10 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 4 }}>
+                              {unblockedItems().length} {unblockedItems().length === 1 ? "item is" : "items are"} not on your affidavit
+                            </div>
+                            <div style={{ fontSize: 11.5, color: "#92400e", lineHeight: 1.6, marginBottom: 10 }}>
+                              Because {unblockedItems().length === 1 ? "it is" : "they are"} not listed there, your letters dispute {unblockedItems().length === 1 ? "it" : "them"} for accuracy under Section 611 rather than requesting a block under 605B. If {unblockedItems().length === 1 ? "it was" : "they were"} also opened or used without your authorization, add {unblockedItems().length === 1 ? "it" : "them"} to your affidavit and the letters will be rebuilt.
+                            </div>
+                            <div style={{ fontSize: 11.5, color: "#92400e", lineHeight: 1.6, marginBottom: 10 }}>
+                              {unblockedItems().join(" · ")}
+                            </div>
+                            <button onClick={() => openAffidavitInChat()} style={{ padding: "9px 14px", background: "#b45309", color: "#fff", border: "none", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                              Add them to my affidavit
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 
